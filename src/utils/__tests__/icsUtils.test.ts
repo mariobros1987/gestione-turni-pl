@@ -63,6 +63,7 @@ const createBaseProfile = (): ProfileData => ({
     dataManagement: false,
     workLocation: false,
     checkIn: false,
+    nfcReport: false,
   },
   operativeCardOrder: [],
   economicCardOrder: [],

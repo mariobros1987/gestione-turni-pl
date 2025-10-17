@@ -244,6 +244,7 @@ export const App = () => {
       dataManagement: true,
       workLocation: true,
       checkIn: true,
+      nfcReport: false,
     },
     operativeCardOrder: ['holidays', 'permits', 'overtime', 'onCall', 'projects', 'shifts', 'workLocation', 'checkIn'],
     economicCardOrder: ['payroll', 'reminders', 'netSalary', 'salarySettings', 'dataManagement'],

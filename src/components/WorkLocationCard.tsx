@@ -7,12 +7,14 @@ interface WorkLocationCardProps extends CollapsibleCardProps {
 }
 
 export const WorkLocationCard: React.FC<WorkLocationCardProps> = ({ workLocation, setWorkLocation, isCollapsed, onToggleCollapse }) => {
+    const [name, setName] = useState(workLocation?.name || '');
     const [address, setAddress] = useState(workLocation?.address || '');
     const [lat, setLat] = useState(workLocation?.lat || '');
     const [lon, setLon] = useState(workLocation?.lon || '');
     const [radius, setRadius] = useState(workLocation?.radius || 50);
 
     useEffect(() => {
+        setName(workLocation?.name || '');
         setAddress(workLocation?.address || '');
         setLat(workLocation?.lat || '');
         setLon(workLocation?.lon || '');
@@ -24,12 +26,13 @@ export const WorkLocationCard: React.FC<WorkLocationCardProps> = ({ workLocation
         const latNum = parseFloat(String(lat));
         const lonNum = parseFloat(String(lon));
 
-        if (!address || isNaN(latNum) || isNaN(lonNum) || radius <= 0) {
+        if (!name || !address || isNaN(latNum) || isNaN(lonNum) || radius <= 0) {
             alert('Per favore, inserisci tutti i campi correttamente.');
             return;
         }
 
         setWorkLocation({
+            name,
             address,
             lat: latNum,
             lon: lonNum,
@@ -48,7 +51,7 @@ export const WorkLocationCard: React.FC<WorkLocationCardProps> = ({ workLocation
             <div className="card-header">
                 <div>
                     <h2>Sede di Lavoro per Check-in</h2>
-                    <p className="summary">{workLocation ? `Sede: ${workLocation.address}` : 'Nessuna sede configurata'}</p>
+                    <p className="summary">{workLocation ? `Sede: ${workLocation.name}` : 'Nessuna sede configurata'}</p>
                 </div>
                 <button onClick={onToggleCollapse} className="btn-toggle-collapse" aria-expanded={!isCollapsed} aria-label={isCollapsed ? "Espandi card" : "Comprimi card"}>
                     {isCollapsed ? '⊕' : '⊖'}
@@ -58,6 +61,17 @@ export const WorkLocationCard: React.FC<WorkLocationCardProps> = ({ workLocation
                 <div className="card-body">
                     <p>Imposta la tua sede di lavoro principale per abilitare la funzione di check-in intelligente basata sulla posizione GPS.</p>
                     <form onSubmit={handleSave}>
+                        <div className="form-group">
+                            <label htmlFor="work-name">Nome Sede</label>
+                            <input
+                                type="text"
+                                id="work-name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Es. Ufficio Milano, Sede Principale"
+                                required
+                            />
+                        </div>
                         <div className="form-group">
                             <label htmlFor="work-address">Indirizzo</label>
                             <input
