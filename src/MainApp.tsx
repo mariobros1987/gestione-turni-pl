@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, DragEvent } from 'react';
-import { ProfileData, AllEntryTypes, HolidayEntry, ShiftOverride, CheckInEntry } from './types/types';
+import { ProfileData, AllEntryTypes, HolidayEntry, ShiftOverride, CheckInEntry, AppointmentEntry } from './types/types';
 import { PayrollCard } from './components/PayrollCard';
 import { ReminderCard } from './components/ReminderCard';
 import { NetSalaryCalculatorCard } from './components/NetSalaryCalculatorCard';
@@ -20,6 +20,8 @@ import { DataManagementCard } from './components/DataManagementCard';
 import { Report } from './components/Report';
 import { WorkLocationCard } from './components/WorkLocationCard';
 import { CheckInCard } from './components/CheckInCard';
+import { NfcCheckInButton } from './components/NfcCheckInButton';
+import NfcReportCard from './components/NfcReportCard';
 import { parseDateAsUTC, calculateHours } from './utils/dateUtils';
 import { parseShiftPattern } from './utils/shiftUtils';
 import { getEventTooltip, getShortEventText } from './utils/eventUtils';
@@ -285,12 +287,50 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     }, [holidays, setHolidays]);
 
     const handleAddCheckIn = (type: 'entrata' | 'uscita') => {
+        const lastEntry = profileData.checkIns.length > 0 ? profileData.checkIns[profileData.checkIns.length - 1] : null;
+        if (lastEntry?.type === type) {
+            console.warn('Check-in duplicato ignorato:', type);
+            return;
+        }
+
+        const timestamp = new Date().toISOString();
         const newCheckIn: CheckInEntry = {
-            id: new Date().toISOString(),
-            timestamp: new Date().toISOString(),
-            type: type,
+            id: timestamp,
+            timestamp,
+            type,
         };
         setCheckIns([...profileData.checkIns, newCheckIn]);
+    };
+
+    const handleCreateEventFromNfc = (type: 'entrata' | 'uscita', timestamp: Date) => {
+        const dateStr = timestamp.toISOString().split('T')[0];
+        const hours = timestamp.getHours();
+        const minutes = timestamp.getMinutes();
+        const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        const location = profileData.workLocation?.name || 'Sede principale';
+        
+        const title = type === 'entrata' 
+            ? `🏢 Entrata presso ${location}`
+            : `🚪 Uscita da ${location}`;
+        
+        // Crea l'evento con un slot di 15 minuti
+        const endTime = new Date(timestamp);
+        endTime.setMinutes(endTime.getMinutes() + 15);
+        const endTimeStr = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+        
+        const newAppointment: AppointmentEntry = {
+            id: `${timestamp.toISOString()}-nfc-${type}`,
+            date: dateStr,
+            type: 'appuntamento',
+            title,
+            notes: `Registrazione automatica NFC alle ore ${timeStr}`,
+            startTime: timeStr,
+            endTime: endTimeStr,
+            value: 0.25, // 15 minuti = 0.25 ore
+        };
+        
+        setAppointments([...profileData.appointments, newAppointment]);
+        console.log(`✅ Evento calendario creato: ${title} alle ${timeStr}`);
     };
 
     const handleDeleteCheckIn = (id: string) => {
@@ -506,7 +546,32 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 projects: <ProjectCard entries={projects} setEntries={setProjects} isCollapsed={collapsedCards.projects} onToggleCollapse={() => toggleCollapse('projects')} />,
                 shifts: <ShiftCard pattern={profileData.shiftPattern} startDate={profileData.cycleStartDate} setStartDate={setCycleStartDate} endDate={profileData.cycleEndDate} setEndDate={setCycleEndDate} onOpenEditor={() => setIsShiftEditorOpen(true)} isCollapsed={collapsedCards.shifts} onToggleCollapse={() => toggleCollapse('shifts')} />,
                 workLocation: <WorkLocationCard workLocation={profileData.workLocation} setWorkLocation={setWorkLocation} isCollapsed={collapsedCards.workLocation} onToggleCollapse={() => toggleCollapse('workLocation')} />,
-                checkIn: <CheckInCard entries={profileData.checkIns} onDelete={handleDeleteCheckIn} isCollapsed={collapsedCards.checkIn} onToggleCollapse={() => toggleCollapse('checkIn')} />,
+                checkIn: (
+                    <CheckInCard
+                        entries={profileData.checkIns}
+                        onDelete={handleDeleteCheckIn}
+                        isCollapsed={collapsedCards.checkIn}
+                        onToggleCollapse={() => toggleCollapse('checkIn')}
+                        extraContent={
+                            <NfcCheckInButton
+                                lastEntryType={profileData.checkIns.length > 0 ? profileData.checkIns[profileData.checkIns.length - 1].type : null}
+                                onRegister={(type) => {
+                                    handleAddCheckIn(type);
+                                }}
+                                onCreateEvent={handleCreateEventFromNfc}
+                                workLocation={profileData.workLocation?.name || 'Sede principale'}
+                            />
+                        }
+                    />
+                ),
+                nfcReport: (
+                    <NfcReportCard
+                        checkIns={profileData.checkIns}
+                        monthDate={new Date()}
+                        isCollapsed={collapsedCards.nfcReport !== undefined ? collapsedCards.nfcReport : false}
+                        onToggleCollapse={() => toggleCollapse('nfcReport')}
+                    />
+                ),
                 payroll: <PayrollCard allEvents={allEvents} settings={profileData.salarySettings} shiftPattern={parsedShiftPattern} cycleStartDate={profileData.cycleStartDate} shiftOverrides={profileData.shiftOverrides} isCollapsed={collapsedCards.payroll} onToggleCollapse={() => toggleCollapse('payroll')} />,
                 reminders: <ReminderCard events={allEvents} reminderDays={reminderDays} setReminderDays={setReminderDays} notificationPermission={notificationPermission} onRequestNotificationPermission={requestNotificationPermission} isCollapsed={collapsedCards.reminders} onToggleCollapse={() => toggleCollapse('reminders')} />,
                 netSalary: <NetSalaryCalculatorCard isCollapsed={collapsedCards.netSalary} onToggleCollapse={() => toggleCollapse('netSalary')} netSalarySettings={profileData.netSalary} setNetSalarySettings={setNetSalarySettings} />,
@@ -514,7 +579,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 dataManagement: <DataManagementCard profileName={profileName} profileData={profileData} allEvents={allEvents} onImportData={onUpdateProfileData} isCollapsed={collapsedCards.dataManagement} onToggleCollapse={() => toggleCollapse('dataManagement')} />,
             };
 
-            const operativeOrder = profileData.operativeCardOrder || ['holidays', 'permits', 'overtime', 'onCall', 'projects', 'shifts', 'workLocation', 'checkIn'];
+            const operativeOrder = profileData.operativeCardOrder || ['holidays', 'permits', 'overtime', 'onCall', 'projects', 'shifts', 'workLocation', 'checkIn', 'nfcReport'];
             const economicOrder = profileData.economicCardOrder || ['payroll', 'reminders', 'netSalary', 'salarySettings', 'dataManagement'];
 
             const renderCard = (key: string) => (

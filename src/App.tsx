@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProfileData } from './types/types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { MainApp } from './MainApp';
@@ -8,7 +8,6 @@ import { authService } from './services/authService';
 import { authService as apiAuthService, UserData as ApiUserData } from './services/apiAuthService';
 import { DebugPanel } from './components/DebugPanel';
 import { profileApiService } from './services/profileApiService';
-import { useRef } from 'react';
 
 export const App = () => {
   // Stato per l'autenticazione (ora gestito dal servizio)
@@ -17,14 +16,13 @@ export const App = () => {
   const [authMessage, setAuthMessage] = useState<string>('');
 
   const [currentUser, setCurrentUser] = useState<ApiUserData | null>(null);
-  // Stato per i profili (solo localStorage per stabilità)
-  const [allProfiles, setAllProfiles] = useLocalStorage<Record<string, ProfileData>>('turni_pl_profiles_data', {});
-  const [activeProfileName, setActiveProfileName] = useLocalStorage<string | null>('turni_pl_active_profile_name', null);
+  // Cache locale del profilo utente (sincronizzata con l'API)
+  const [profileData, setProfileData] = useLocalStorage<ProfileData | null>('turni_pl_profile_data', null as ProfileData | null);
   const saveTimeoutRef = useRef<number | null>(null);
   const lastLocalChangeRef = useRef<number>(0);
   const lastServerSnapshotRef = useRef<string>('');
 
-  const deriveProfileName = (user: ApiUserData | null): string | null => {
+  const deriveProfileKey = (user: ApiUserData | null): string | null => {
     if (!user) {
       return null;
     }
@@ -37,42 +35,28 @@ export const App = () => {
     return null;
   };
 
+  const ensureProfileForUser = (data: ProfileData, profileKey: string): ProfileData => {
+    return data.onCallFilterName === profileKey ? data : { ...data, onCallFilterName: profileKey };
+  };
+
   const applyProfileSnapshot = (
-    snapshot: Record<string, ProfileData> | null | undefined,
+    snapshot: ProfileData | null | undefined,
     user: ApiUserData | null = currentUser
   ) => {
-    const profileName = deriveProfileName(user);
-    if (!profileName) {
+    const profileKey = deriveProfileKey(user);
+    if (!profileKey) {
       return null;
     }
 
-    const existing = snapshot?.[profileName];
-    const availableNames = snapshot ? Object.keys(snapshot) : [];
+    const source = snapshot ?? profileData ?? getInitialProfileData(profileKey);
+    const normalized = ensureProfileForUser(source, profileKey);
 
-    let sourceProfile = existing ?? null;
-    let existed = Boolean(existing);
-
-    if (!sourceProfile && availableNames.length > 0) {
-      sourceProfile = snapshot![availableNames[0]];
-      existed = false;
-    }
-
-    let profileData = sourceProfile ?? getInitialProfileData(profileName);
-
-    if (profileData.onCallFilterName !== profileName) {
-      profileData = { ...profileData, onCallFilterName: profileName };
-    }
-
-    const normalized: Record<string, ProfileData> = { [profileName]: profileData };
-
-    setAllProfiles(normalized);
-    setActiveProfileName(profileName);
+    setProfileData(normalized);
 
     return {
-      profileName,
-      profileData,
-      normalized,
-      existed,
+      profileKey,
+      profileData: normalized,
+      existed: Boolean(snapshot),
       snapshotString: JSON.stringify(normalized)
     };
   };
@@ -92,7 +76,7 @@ export const App = () => {
             const now = Date.now();
             const THROTTLE_MS = 1000 * 60 * 60 * 24; // 24h
             if (!last || now - parseInt(last, 10) > THROTTLE_MS) {
-              const res = await profileApiService.repairProfiles();
+              const res = await profileApiService.repairProfile();
               if (res.success) {
                 localStorage.setItem(repairKey, now.toString());
               }
@@ -101,12 +85,12 @@ export const App = () => {
           // Sincronizza contro il server privilegiando i dati più recenti lato backend
           try {
             const prefer = profileApiService.hasPendingSync() ? 'local' : 'server';
-            const synced = await profileApiService.syncProfiles({ prefer });
-            const applied = applyProfileSnapshot(synced?.profiles ?? null, user);
+            const synced = await profileApiService.syncProfile({ prefer });
+            const applied = applyProfileSnapshot(synced?.profile ?? null, user);
             if (applied) {
               lastServerSnapshotRef.current = applied.snapshotString;
               if (!applied.existed) {
-                try { await profileApiService.saveProfiles(applied.normalized, { fullSync: true }); } catch {}
+                try { await profileApiService.saveProfile(applied.profileData); } catch {}
               }
             }
           } catch {}
@@ -122,7 +106,7 @@ export const App = () => {
           const localUser = authService.getCurrentUser() as unknown as ApiUserData | null;
           if (localUser) {
             setCurrentUser(localUser);
-            const applied = applyProfileSnapshot(allProfiles, localUser);
+            const applied = applyProfileSnapshot(profileData, localUser);
             if (applied) {
               lastServerSnapshotRef.current = applied.snapshotString;
             }
@@ -148,7 +132,7 @@ export const App = () => {
           const now = Date.now();
           const THROTTLE_MS = 1000 * 60 * 60 * 24;
           if (!last || now - parseInt(last, 10) > THROTTLE_MS) {
-            const res = await profileApiService.repairProfiles();
+            const res = await profileApiService.repairProfile();
             if (res.success) {
               localStorage.setItem(repairKey, now.toString());
             }
@@ -158,12 +142,12 @@ export const App = () => {
       // Dopo login sincronizza contro il server scegliendo la fonte più aggiornata
       try {
         const prefer = profileApiService.hasPendingSync() ? 'local' : 'server';
-        const synced = await profileApiService.syncProfiles({ prefer });
-        const applied = applyProfileSnapshot(synced?.profiles ?? null, user ?? currentUser);
+        const synced = await profileApiService.syncProfile({ prefer });
+        const applied = applyProfileSnapshot(synced?.profile ?? null, user ?? currentUser);
         if (applied) {
           lastServerSnapshotRef.current = applied.snapshotString;
           if (!applied.existed) {
-            try { await profileApiService.saveProfiles(applied.normalized, { fullSync: true }); } catch {}
+            try { await profileApiService.saveProfile(applied.profileData); } catch {}
           }
         }
       } catch {}
@@ -176,8 +160,11 @@ export const App = () => {
     authService.logout();
     setIsAuthenticated(false);
     setCurrentUser(null);
-    setAllProfiles({});
-    setActiveProfileName(null);
+    setProfileData(null);
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
     lastServerSnapshotRef.current = '';
   };
 
@@ -272,13 +259,12 @@ export const App = () => {
   }
 
   const handleUpdateProfileData = (newData: ProfileData) => {
-    const profileName = deriveProfileName(currentUser);
-    if (!profileName) return;
+    const profileKey = deriveProfileKey(currentUser);
+    if (!profileKey) return;
 
-    const normalized: Record<string, ProfileData> = { [profileName]: newData };
+    const normalized = ensureProfileForUser(newData, profileKey);
 
-    setAllProfiles(normalized);
-    setActiveProfileName(profileName);
+    setProfileData(normalized);
     lastLocalChangeRef.current = Date.now();
 
     try {
@@ -287,7 +273,7 @@ export const App = () => {
       }
       saveTimeoutRef.current = window.setTimeout(async () => {
         try {
-          const saved = await profileApiService.saveProfiles(normalized, { fullSync: true });
+          const saved = await profileApiService.saveProfile(normalized);
           if (saved) {
             lastServerSnapshotRef.current = JSON.stringify(normalized);
           }
@@ -299,7 +285,7 @@ export const App = () => {
   };
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !currentUser) {
       return;
     }
 
@@ -317,50 +303,31 @@ export const App = () => {
       }
 
       try {
-        const profileName = deriveProfileName(currentUser);
-        if (!profileName) {
+        const profileKey = deriveProfileKey(currentUser);
+        if (!profileKey) {
           return;
         }
 
-        const serverProfiles = await profileApiService.getProfiles();
-        if (!serverProfiles) {
+        const serverProfile = await profileApiService.getProfile();
+        if (!serverProfile) {
           return;
         }
 
-        const availableNames = Object.keys(serverProfiles);
-        const previewSource = serverProfiles[profileName]
-          ?? (availableNames.length > 0 ? serverProfiles[availableNames[0]] : undefined)
-          ?? getInitialProfileData(profileName);
-
-        const previewNormalized = {
-          [profileName]: previewSource.onCallFilterName === profileName
-            ? previewSource
-            : { ...previewSource, onCallFilterName: profileName }
-        };
-
-        const previewSnapshot = JSON.stringify(previewNormalized);
+        const normalized = ensureProfileForUser(serverProfile, profileKey);
+        const previewSnapshot = JSON.stringify(normalized);
         if (!force && previewSnapshot === lastServerSnapshotRef.current) {
           return;
         }
 
-        const previousSnapshot = lastServerSnapshotRef.current;
-        const applied = applyProfileSnapshot(serverProfiles);
-        if (!applied) {
-          lastServerSnapshotRef.current = previousSnapshot;
-          return;
-        }
-
-        lastServerSnapshotRef.current = applied.snapshotString;
+        setProfileData(normalized);
+        lastServerSnapshotRef.current = previewSnapshot;
         lastLocalChangeRef.current = Date.now();
-
-        if (!applied.existed) {
-          try { await profileApiService.saveProfiles(applied.normalized, { fullSync: true }); } catch {}
-        }
       } catch (error) {
         console.error('❌ Errore sincronizzazione server → client:', error);
       }
     };
 
+    // Solo la prima sync all'avvio
     pullServerProfiles(true);
 
     const intervalId = window.setInterval(() => {
@@ -380,20 +347,8 @@ export const App = () => {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isAuthenticated, setAllProfiles]);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-    if (activeProfileName && allProfiles[activeProfileName]) {
-      return;
-    }
-    const names = Object.keys(allProfiles || {});
-    if (names.length > 0) {
-      setActiveProfileName(names[0]);
-    }
-  }, [isAuthenticated, allProfiles, activeProfileName, setActiveProfileName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser?.id]);
 
   if (!isAuthenticated) {
     return (
@@ -407,10 +362,10 @@ export const App = () => {
     );
   }
 
-  const profileName = deriveProfileName(currentUser);
-  const profileData = profileName ? allProfiles[profileName] : null;
+  const profileKey = deriveProfileKey(currentUser);
+  const resolvedProfile = profileData;
 
-  if (!profileName || !profileData) {
+  if (!profileKey || !resolvedProfile) {
     return (
       <div className="profile-loading">
         <p>Caricamento dati profilo…</p>
@@ -420,8 +375,8 @@ export const App = () => {
 
   return (
     <MainApp
-      profileName={profileName}
-      profileData={profileData}
+      profileName={profileKey}
+      profileData={resolvedProfile}
       onUpdateProfileData={handleUpdateProfileData}
       onLogout={handleLogout}
     />

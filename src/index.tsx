@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AppWithDebug } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './utils/adblock'; // Previeni AdSense automatico
+import '../index.css'; // Importa CSS principale
 
 console.log('📱 INDEX: Inizializzazione app...');
 

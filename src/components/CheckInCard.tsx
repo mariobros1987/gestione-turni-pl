@@ -4,9 +4,10 @@ import { CollapsibleCardProps, CheckInEntry } from '../types/types';
 interface CheckInCardProps extends CollapsibleCardProps {
     entries: CheckInEntry[];
     onDelete: (id: string) => void;
+    extraContent?: React.ReactNode;
 }
 
-export const CheckInCard: React.FC<CheckInCardProps> = ({ entries, onDelete, isCollapsed, onToggleCollapse }) => {
+export const CheckInCard: React.FC<CheckInCardProps> = ({ entries, onDelete, isCollapsed, onToggleCollapse, extraContent }) => {
     // Sort entries chronologically, most recent first
     const sortedEntries = [...entries].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -23,6 +24,14 @@ export const CheckInCard: React.FC<CheckInCardProps> = ({ entries, onDelete, isC
             </div>
             {!isCollapsed && (
                 <div className="card-body">
+                    {extraContent && (
+                        <div
+                            className="card-section card-section--actions"
+                            style={{ marginBottom: sortedEntries.length > 0 ? '1rem' : 0 }}
+                        >
+                            {extraContent}
+                        </div>
+                    )}
                     {sortedEntries.length > 0 ? (
                         <ul className="entry-list check-in-list">
                             {sortedEntries.map(entry => {

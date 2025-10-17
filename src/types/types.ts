@@ -75,6 +75,7 @@ export interface ShiftOverride {
 
 // --- NUOVI TIPI PER CHECK-IN BASATO SU POSIZIONE ---
 export interface WorkLocation {
+    name: string; // Nome della sede
     address: string;
     lat: number;
     lon: number;
@@ -160,6 +161,7 @@ export interface ProfileData {
         dataManagement: boolean;
         workLocation: boolean;
         checkIn: boolean;
+        nfcReport: boolean;
     };
     operativeCardOrder: string[];
     economicCardOrder: string[];
