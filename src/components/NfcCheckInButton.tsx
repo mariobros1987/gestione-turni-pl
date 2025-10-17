@@ -33,7 +33,7 @@ type CheckInType = 'entrata' | 'uscita';
 type ScanStatus = 'idle' | 'scanning' | 'success' | 'error';
 
 export interface NfcCheckInButtonProps {
-  onRegister: (type: CheckInType, context?: { rawPayload?: string; serialNumber?: string }) => void;
+  onRegister: (type: CheckInType, context?: { rawPayload?: string; serialNumber?: string; timestamp?: Date }) => void;
   lastEntryType?: CheckInType | null;
   onCreateEvent?: (type: CheckInType, timestamp: Date) => void; // Callback per creare evento calendario
   workLocation?: string; // Sede di lavoro da inserire nell'evento
@@ -204,7 +204,7 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
     }
   }, [abortScan, isSupported, lastEntryType, onRegister, onCreateEvent, workLocation, status]);
 
-  // Funzione di simulazione per testing
+  // Funzione di simulazione per testing con timestamp realistico
   const handleSimulate = useCallback((type: CheckInType) => {
     if (lastEntryType && lastEntryType === type) {
       setStatus('error');
@@ -212,12 +212,21 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
       return;
     }
 
-    const timestamp = new Date();
+    // Per la simulazione, aggiungiamo un offset temporale realistico:
+    // - Entrata: usa orario corrente (es. 09:00)
+    // - Uscita: aggiungi 8 ore all'entrata per simulare giornata lavorativa
+    let timestamp = new Date();
     
-    // Registra check-in
+    if (type === 'uscita' && lastEntryType === 'entrata') {
+      // Simula 8 ore di lavoro dall'ultima entrata per test realistico
+      timestamp = new Date(timestamp.getTime() + 8 * 60 * 60 * 1000);
+    }
+    
+    // Registra check-in con timestamp custom
     onRegister(type, {
       rawPayload: `SIMULAZIONE: ${type}`,
       serialNumber: `SIM-${Date.now()}`,
+      timestamp, // Passa il timestamp alla funzione
     });
     
     // Crea evento calendario se callback fornito
@@ -226,7 +235,8 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
     }
     
     setStatus('success');
-    setMessage(`✓ Simulazione ${type.charAt(0).toUpperCase() + type.slice(1)} registrata presso ${workLocation}`);
+    const timeStr = timestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    setMessage(`✓ Simulazione ${type.charAt(0).toUpperCase() + type.slice(1)} registrata alle ${timeStr} presso ${workLocation}`);
   }, [lastEntryType, onRegister, onCreateEvent, workLocation]);
 
   return (

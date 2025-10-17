@@ -286,14 +286,14 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
 
     }, [holidays, setHolidays]);
 
-    const handleAddCheckIn = (type: 'entrata' | 'uscita') => {
+    const handleAddCheckIn = (type: 'entrata' | 'uscita', customTimestamp?: Date) => {
         const lastEntry = profileData.checkIns.length > 0 ? profileData.checkIns[profileData.checkIns.length - 1] : null;
         if (lastEntry?.type === type) {
             console.warn('Check-in duplicato ignorato:', type);
             return;
         }
 
-        const timestamp = new Date().toISOString();
+        const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
         const newCheckIn: CheckInEntry = {
             id: timestamp,
             timestamp,
@@ -555,8 +555,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         extraContent={
                             <NfcCheckInButton
                                 lastEntryType={profileData.checkIns.length > 0 ? profileData.checkIns[profileData.checkIns.length - 1].type : null}
-                                onRegister={(type) => {
-                                    handleAddCheckIn(type);
+                                onRegister={(type, context) => {
+                                    handleAddCheckIn(type, context?.timestamp);
                                 }}
                                 onCreateEvent={handleCreateEventFromNfc}
                                 workLocation={profileData.workLocation?.name || 'Sede principale'}
