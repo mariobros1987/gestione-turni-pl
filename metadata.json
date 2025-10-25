@@ -1,0 +1,7 @@
+{
+  "name": "Gestione Turni P.L.",
+  "description": "Un'app per agenti di Polizia Locale per gestire ferie, permessi, straordinari e reperibilità.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
