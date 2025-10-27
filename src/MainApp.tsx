@@ -88,8 +88,9 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 const { data, error } = await supabase
                     .from('checkin')
                     .select('*')
-                    .eq('user_id', user.id)
+                    .eq('userId', user.id)
                     .order('timestamp', { ascending: true });
+                console.log('DEBUG CHECKIN QUERY userId:', user.id, 'Risultato:', data, 'Errore:', error);
                 if (error) return;
                 // Raggruppa per giorno e crea appuntamenti "Presenza"
                 const byDay: Record<string, { entrata?: any; uscita?: any }> = {};

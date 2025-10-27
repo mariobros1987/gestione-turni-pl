@@ -25,7 +25,7 @@ const NfcReader: React.FC = () => {
       const { data, error: fetchError } = await supabase
         .from('checkin')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('userId', user.id)
         .gte('timestamp', `${todayLocal}T00:00:00`)
         .lte('timestamp', `${todayLocal}T23:59:59`)
         .order('timestamp', { ascending: true });
@@ -41,7 +41,7 @@ const NfcReader: React.FC = () => {
       const timestamp = new Date().toISOString();
       const { error: dbError } = await supabase.from('checkin').insert([
         {
-          user_id: user.id,
+          userId: user.id,
           azione,
           timestamp,
           tag_content: tagContent
