@@ -39,7 +39,7 @@ async function ensureProfilesTable() {
     const hasColumn = (name: string) => columns.some(col => col.column_name === name)
 
     const renameMap: Array<{ from: string; to: string }> = [
-      { from: 'user_id', to: 'userId' },
+  { from: 'user_id', to: 'userId' },
       { from: 'is_active', to: 'isActive' },
       { from: 'created_at', to: 'createdAt' },
       { from: 'updated_at', to: 'updatedAt' }
@@ -249,7 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('✅ Token valido per utente:', decoded.email);
     const userId = (decoded as any).userId
 
-    await ensureProfilesTable()
+  await ensureProfilesTable()
 
     if (req.method === 'GET') {
       // Carica i profili persistiti per l'utente, con sanitizzazione

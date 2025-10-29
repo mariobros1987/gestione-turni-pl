@@ -208,6 +208,22 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
     // Drag & Drop State
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
 
+    // Normalizzazione difensiva per evitare errori su .reduce
+    const safeProfileData: ProfileData = {
+        ...profileData,
+        holidays: Array.isArray(profileData.holidays) ? profileData.holidays : [],
+        permits: Array.isArray(profileData.permits) ? profileData.permits : [],
+        overtime: Array.isArray(profileData.overtime) ? profileData.overtime : [],
+        onCall: Array.isArray(profileData.onCall) ? profileData.onCall : [],
+        projects: Array.isArray(profileData.projects) ? profileData.projects : [],
+        appointments: Array.isArray(profileData.appointments) ? profileData.appointments : [],
+        checkIns: Array.isArray(profileData.checkIns) ? profileData.checkIns : [],
+        sentNotifications: Array.isArray(profileData.sentNotifications) ? profileData.sentNotifications : [],
+        operativeCardOrder: Array.isArray(profileData.operativeCardOrder) ? profileData.operativeCardOrder : [],
+        economicCardOrder: Array.isArray(profileData.economicCardOrder) ? profileData.economicCardOrder : [],
+        dashboardLayout: Array.isArray(profileData.dashboardLayout) ? profileData.dashboardLayout : [],
+    };
+
     const stats = useMemo(() => {
         // ... (same stat calculation logic as before)
         const year = selectedDate.getFullYear();
@@ -219,10 +235,10 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
         const overtimeHoursThisMonth = allEvents.filter(e => e.type === 'straordinario' && monthFilter(e)).reduce((sum, e) => sum + e.value, 0);
         const permitHoursThisMonth = allEvents.filter(e => e.type === 'permessi' && monthFilter(e)).reduce((sum, e) => sum + e.value, 0);
         const projectHoursThisMonth = allEvents.filter(e => e.type === 'progetto' && monthFilter(e)).reduce((sum, e) => sum + e.value, 0);
-        const usedHolidays = profileData.holidays.reduce((sum, entry) => sum + entry.value, 0);
-        const remainingHolidays = (profileData.totalCurrentYearHolidays + profileData.totalPreviousYearsHolidays) - usedHolidays;
+    const usedHolidays = (safeProfileData.holidays || []).reduce((sum, entry) => sum + entry.value, 0);
+        const remainingHolidays = (safeProfileData.totalCurrentYearHolidays + safeProfileData.totalPreviousYearsHolidays) - usedHolidays;
         return { overtimeHoursThisMonth, permitHoursThisMonth, projectHoursThisMonth, remainingHolidays };
-    }, [allEvents, profileData, selectedDate]);
+    }, [allEvents, safeProfileData, selectedDate]);
     
     const selectedMonthName = useMemo(() => {
         const month = selectedDate.toLocaleString('it-IT', { month: 'long' });

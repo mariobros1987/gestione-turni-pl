@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { sendCheckIn } from '../services/checkinApiService';
 
 // Nota: Web NFC è supportato principalmente su Chrome per Android. Forniamo tipizzazioni minime
 // per evitare errori TypeScript quando l'API non è disponibile in ambienti desktop.
@@ -166,9 +167,25 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
         const timestamp = new Date();
         
         // Registra check-in
-        onRegister(detectedType, {
-          rawPayload,
-          serialNumber: event.serialNumber,
+
+        // Invio check-in al backend
+        sendCheckIn({
+          type: detectedType,
+          timestamp: timestamp.toISOString(),
+          serialNumber: event.serialNumber || undefined
+        }).then(res => {
+          if (!res.success) {
+            setStatus('error');
+            setMessage('Errore registrazione presenza: ' + (res.message || '')); 
+            return;
+          }
+          onRegister(detectedType, {
+            rawPayload,
+            serialNumber: event.serialNumber,
+            timestamp
+          });
+          setStatus('success');
+          setMessage(`✓ ${detectedType.charAt(0).toUpperCase() + detectedType.slice(1)} registrata presso ${workLocation}`);
         });
         
         // Crea evento calendario se callback fornito

@@ -7,10 +7,17 @@ export class ProfileApiService {
   private readonly baseUrl: string;
 
   constructor() {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      this.baseUrl = window.location.origin;
+    if (
+      typeof window !== 'undefined' &&
+      window.location?.origin &&
+      window.location.port === '5173'
+    ) {
+      // In sviluppo con Vite: usa richieste relative per sfruttare il proxy
+      this.baseUrl = '';
     } else if (process.env.VERCEL_URL) {
       this.baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (typeof window !== 'undefined') {
+      this.baseUrl = window.location.origin;
     } else {
       this.baseUrl = 'http://localhost:3000';
     }
@@ -105,13 +112,13 @@ export class ProfileApiService {
 
       const data = await response.json();
       if (data.success) {
-        const profile = data.profile as ProfileData | null;
+        // Il backend può rispondere con { user: ... } oppure { profile: ... }
+        const profile = (data.profile || data.user) as ProfileData | null;
         if (profile) {
           this.writeLocalProfile(profile);
         }
         return profile ?? null;
       }
-
       return null;
     } catch (error) {
       console.error('❌ Errore connessione API profilo:', error);
@@ -120,6 +127,7 @@ export class ProfileApiService {
   }
 
   private async pushProfileToServer(profile: ProfileData): Promise<boolean> {
+  console.log('[DEBUG] Profilo inviato al backend:', profile);
     const authHeaders = this.getAuthHeaders();
     if (!authHeaders.Authorization) {
       return false;

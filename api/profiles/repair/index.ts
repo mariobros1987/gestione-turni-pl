@@ -88,13 +88,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS profiles (
         id BIGSERIAL PRIMARY KEY,
-        user_id TEXT NOT NULL,
+        userId TEXT NOT NULL,
         name TEXT NOT NULL,
         data JSONB NOT NULL,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (user_id, name)
+        isActive BOOLEAN NOT NULL DEFAULT TRUE,
+        createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (userId, name)
       )
     `)
   } catch (e) {
@@ -105,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const rows: Array<{ id: number; name: string; data: any }> = await prisma.$queryRawUnsafe(
-      `SELECT id, name, data FROM profiles WHERE user_id = $1`,
+      `SELECT id, name, data FROM profiles WHERE userId = $1`,
       userId
     )
 

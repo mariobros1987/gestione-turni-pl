@@ -13,14 +13,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-  .order('name', { ascending: true })
+        .order('name', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        return res.status(500).json({ success: false, message: error.message, details: error })
+      }
 
       res.status(200).json({ success: true, data })
     } catch (error: any) {
-      console.error('Error:', error)
-      res.status(500).json({ success: false, message: error.message })
+      console.error('Unhandled error:', error)
+      res.status(500).json({ success: false, message: error.message, details: error })
     }
   } else {
     res.status(405).json({ message: 'Method not allowed' })

@@ -43,6 +43,10 @@ interface MainAppProps {
 }
 
 export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUpdateProfileData, onLogout }) => {
+    // Safety check: profileData must not be null
+    if (!profileData) {
+        return <div className="profile-loading"><p>Caricamento dati profilo…</p></div>;
+    }
     // Funzione per creare i setter
     const createSetter = <K extends keyof ProfileData>(key: K) => {
         return (value: ProfileData[K]) => {
@@ -201,64 +205,6 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     
     // Create setters that call the main update function
 
-    
-    
-    useEffect(() => {
-    let polling = true;
-    async function fetchCheckInsAndSyncAppointments() {
-        try {
-            const { supabase } = await import('./lib/supabase');
-            const userJson = localStorage.getItem('turni_pl_current_user');
-            const user = userJson ? JSON.parse(userJson) : null;
-            if (!user) return;
-            const { data, error } = await supabase
-                .from('checkin')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('timestamp', { ascending: true });
-            if (error) return;
-            // Raggruppa per giorno e crea appuntamenti "Presenza"
-            const byDay: Record<string, { entrata?: any; uscita?: any }> = {};
-            for (const entry of data) {
-                const date = entry.timestamp.split('T')[0];
-                if (!byDay[date]) byDay[date] = {};
-                if (entry.azione === 'entrata') byDay[date].entrata = entry;
-                if (entry.azione === 'uscita') byDay[date].uscita = entry;
-            }
-            const newAppointments: AppointmentEntry[] = [];
-            for (const date in byDay) {
-                const entrata = byDay[date].entrata;
-                const uscita = byDay[date].uscita;
-                if (entrata && uscita) {
-                    const startTime = new Date(entrata.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                    const endTime = new Date(uscita.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-                    const oreLavorate = (new Date(uscita.timestamp).getTime() - new Date(entrata.timestamp).getTime()) / (1000 * 60 * 60);
-                    newAppointments.push({
-                        id: `${entrata.id}-${uscita.id}-presenza`,
-                        date,
-                        type: 'appuntamento',
-                        title: 'Presenza',
-                        notes: `Entrata: ${startTime} - Uscita: ${endTime}`,
-                        startTime,
-                        endTime,
-                        value: parseFloat(oreLavorate.toFixed(2)),
-                    });
-                }
-            }
-            // Aggiorna solo se ci sono cambiamenti
-            if (JSON.stringify(newAppointments) !== JSON.stringify(profileData.appointments.filter(a => a.title === 'Presenza'))) {
-                const otherAppointments = profileData.appointments.filter(a => a.title !== 'Presenza');
-                setAppointments([...otherAppointments, ...newAppointments]);
-            }
-        } catch {}
-    }
-    fetchCheckInsAndSyncAppointments();
-    const interval = setInterval(() => {
-        if (polling) fetchCheckInsAndSyncAppointments();
-    }, 15000);
-    return () => { polling = false; clearInterval(interval); };
-}, [profileData.appointments, setAppointments]);
-
     // Local UI state (not persisted per profile)
     const [eventModalState, setEventModalState] = useState<{ mode: 'add' | 'edit'; entry: AllEntryTypes | null; date: string; type?: AllEntryTypes['type'] } | null>(null);
     const [dayPopoverData, setDayPopoverData] = useState<{ date: string, events: AllEntryTypes[], shiftOverride: ShiftOverride | null } | null>(null);
@@ -280,8 +226,69 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const [dragOverItem, setDragOverItem] = useState<string | null>(null);
 
 
-    const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = profileData;
-
+    // Dopo la normalizzazione difensiva:
+    // Sostituisci tutte le occorrenze di profileData con safeProfileData
+    const safeProfileData: ProfileData = {
+        ...profileData,
+        holidays: Array.isArray(profileData.holidays) ? profileData.holidays : [],
+        permits: Array.isArray(profileData.permits) ? profileData.permits : [],
+        overtime: Array.isArray(profileData.overtime) ? profileData.overtime : [],
+    onCall: Array.isArray(profileData.onCall) ? profileData.onCall : [],
+    projects: Array.isArray(profileData.projects) ? profileData.projects : [],
+    appointments: Array.isArray(profileData.appointments) ? profileData.appointments : [],
+    checkIns: Array.isArray(profileData.checkIns) ? profileData.checkIns : [],
+    sentNotifications: Array.isArray(profileData.sentNotifications) ? profileData.sentNotifications : [],
+    operativeCardOrder: Array.isArray(profileData.operativeCardOrder) ? profileData.operativeCardOrder : [],
+    economicCardOrder: Array.isArray(profileData.economicCardOrder) ? profileData.economicCardOrder : [],
+    dashboardLayout: Array.isArray(profileData.dashboardLayout) ? profileData.dashboardLayout : [],
+    shiftOverrides: profileData.shiftOverrides && typeof profileData.shiftOverrides === 'object' ? profileData.shiftOverrides : {},
+    collapsedCards: profileData.collapsedCards && typeof profileData.collapsedCards === 'object' ? profileData.collapsedCards : {
+        holidays: false,
+        permits: false,
+        overtime: false,
+        onCall: false,
+        projects: false,
+        shifts: false,
+        salarySettings: false,
+        payroll: false,
+        netSalary: false,
+        reminders: false,
+        dataManagement: false,
+        workLocation: false,
+        checkIn: false,
+        nfcReport: false
+    },
+    totalCurrentYearHolidays: typeof profileData.totalCurrentYearHolidays === 'number' ? profileData.totalCurrentYearHolidays : 0,
+    totalPreviousYearsHolidays: typeof profileData.totalPreviousYearsHolidays === 'number' ? profileData.totalPreviousYearsHolidays : 0,
+    salarySettings: profileData.salarySettings && typeof profileData.salarySettings === 'object' ? profileData.salarySettings : {
+        baseRate: 0,
+        overtimeDiurnoRate: 0,
+        overtimeNotturnoRate: 0,
+        overtimeFestivoRate: 0,
+        onCallFerialeRate: 0,
+        onCallFestivaRate: 0,
+        projectRate: 0
+    },
+    netSalary: profileData.netSalary && typeof profileData.netSalary === 'object' ? profileData.netSalary : {
+        ral: 0,
+        addRegionale: 0,
+        addComunale: 0,
+        detrazioniFamiliari: 0,
+        bonusIrpef: 0
+    },
+    };
+    const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = safeProfileData;
+    // Imposta filters di default se non definiti
+    const defaultCalendarFilters = {
+        ferie: true,
+        permessi: true,
+        straordinario: true,
+        reperibilita: true,
+        progetto: true,
+        appuntamento: true,
+        shifts: true
+    };
+    const filters = calendarFilters && typeof calendarFilters === 'object' ? { ...defaultCalendarFilters, ...calendarFilters } : defaultCalendarFilters;
     const requestNotificationPermission = useCallback(async () => {
         if (typeof window === 'undefined' || !('Notification' in window) || typeof Notification === 'undefined') {
             alert('Questo browser non supporta le notifiche desktop.');
@@ -449,12 +456,12 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                     const userJson = localStorage.getItem('turni_pl_current_user');
                     const user = userJson ? JSON.parse(userJson) : null;
                     if (user) {
-                        await supabase
-                          .from('checkin')
-                          .delete()
-                          .eq('user_id', user.id)
-                          .gte('timestamp', `${presenza.date}T00:00:00`)
-                          .lte('timestamp', `${presenza.date}T23:59:59`);
+                                                await supabase
+                                                    .from('checkin')
+                                                    .delete()
+                                                    .eq('userId', user.id)
+                                                    .gte('timestamp', `${presenza.date}T00:00:00`)
+                                                    .lte('timestamp', `${presenza.date}T23:59:59`);
                     }
                 })();
             }
@@ -520,24 +527,36 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     }, [holidays, setHolidays]);
 
     const handleAddCheckIn = (type: 'entrata' | 'uscita', customTimestamp?: Date) => {
-        const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
+    const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
+    // Normalizzazione difensiva per appointments
+    const safeAppointments = Array.isArray(profileData.appointments) ? profileData.appointments : [];
         if (type === 'entrata') {
             // Salva solo in stato temporaneo, NON visualizzare nel calendario
             setPendingNfcEntry({ id: timestamp, timestamp, type });
         } else if (type === 'uscita') {
-            if (!pendingNfcEntry || pendingNfcEntry.type !== 'entrata') {
-                console.warn('Non puoi registrare una uscita senza una entrata NFC aperta.');
+            let entrataRef = pendingNfcEntry && pendingNfcEntry.type === 'entrata' ? pendingNfcEntry : null;
+            // Se non c'è pendingNfcEntry, cerca l'ultimo check-in di tipo 'entrata' tra i checkIns
+            if (!entrataRef) {
+                const lastEntrata = Array.isArray(profileData.checkIns)
+                    ? profileData.checkIns.filter((c) => c.type === 'entrata').slice(-1)[0]
+                    : null;
+                if (lastEntrata) {
+                    entrataRef = { id: lastEntrata.id, timestamp: lastEntrata.timestamp, type: 'entrata' };
+                }
+            }
+            if (!entrataRef) {
+                console.warn('Non puoi registrare una uscita senza una entrata NFC aperta o precedente.');
                 return;
             }
             // Crea evento unico "Presenza" con orario entrata/uscita
-            const tEntrata = new Date(pendingNfcEntry.timestamp);
+            const tEntrata = new Date(entrataRef.timestamp);
             const tUscita = customTimestamp ? customTimestamp : new Date();
             const startTime = tEntrata.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
             const endTime = tUscita.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
             const dateStr = tEntrata.toISOString().split('T')[0];
             const oreLavorate = (tUscita.getTime() - tEntrata.getTime()) / (1000 * 60 * 60);
             const newAppointment = {
-                id: `${pendingNfcEntry.id}-${timestamp}-presenza`,
+                id: `${entrataRef.id}-${timestamp}-presenza`,
                 date: dateStr,
                 type: 'appuntamento' as const,
                 title: 'Presenza',
@@ -546,7 +565,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 endTime,
                 value: parseFloat(oreLavorate.toFixed(2)),
             };
-            setAppointments([...profileData.appointments, newAppointment]);
+            setAppointments([...safeAppointments, newAppointment]);
             setPendingNfcEntry(null);
         }
     };
@@ -744,12 +763,12 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
              return (
                 <Dashboard 
                     allEvents={allEvents} 
-                    profileData={profileData} 
+                    profileData={safeProfileData} 
                     notificationPermission={notificationPermission}
                     onRequestNotificationPermission={requestNotificationPermission}
                     setReminderDays={setReminderDays}
                     onAddCheckIn={handleAddCheckIn}
-                    layout={profileData.dashboardLayout || []}
+                    layout={safeProfileData.dashboardLayout || []}
                     setLayout={setDashboardLayout}
                     onOpenModalWithAiData={handleOpenModalWithAiData}
                 />
@@ -759,15 +778,15 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         if (view === 'calendar') {
             return (
                 <>
-                    <CalendarFilters filters={calendarFilters} setFilters={setCalendarFilters} />
+                    <CalendarFilters filters={filters} setFilters={setCalendarFilters} />
                     <Calendar 
                         events={allEvents} 
                         onDayClick={handleDayClick} 
                         shiftPattern={parsedShiftPattern}
-                        cycleStartDate={profileData.cycleStartDate}
-                        cycleEndDate={profileData.cycleEndDate}
+                        cycleStartDate={safeProfileData.cycleStartDate}
+                        cycleEndDate={safeProfileData.cycleEndDate}
                         shiftOverrides={shiftOverrides}
-                        filters={calendarFilters}
+                        filters={filters}
                         onShowTooltip={handleShowTooltip}
                         onHideTooltip={handleHideTooltip}
                     />
@@ -779,7 +798,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             return (
                 <Report
                     allEvents={allEvents}
-                    profileData={profileData}
+                    profileData={safeProfileData}
                 />
             );
         }
@@ -787,51 +806,59 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         // Grid View with Draggable Cards
         if(view === 'grid') {
             // FIX: Replaced `JSX.Element` with `React.ReactElement` to resolve TypeScript namespace error.
+            // Passa filters solo alle card che lo supportano realmente come prop
             const allCards: { [key: string]: React.ReactElement } = {
-                holidays: <HolidayCard entries={holidays} setEntries={setHolidays} isCollapsed={collapsedCards.holidays} onToggleCollapse={() => toggleCollapse('holidays')} totalCurrentYear={profileData.totalCurrentYearHolidays} setTotalCurrentYear={setTotalCurrentYearHolidays} totalPreviousYears={profileData.totalPreviousYearsHolidays} setTotalPreviousYears={setTotalPreviousYearsHolidays} />,
+                holidays: <HolidayCard entries={holidays} setEntries={setHolidays} isCollapsed={collapsedCards.holidays} onToggleCollapse={() => toggleCollapse('holidays')} totalCurrentYear={safeProfileData.totalCurrentYearHolidays} setTotalCurrentYear={setTotalCurrentYearHolidays} totalPreviousYears={safeProfileData.totalPreviousYearsHolidays} setTotalPreviousYears={setTotalPreviousYearsHolidays} />,
                 permits: <PermitCard entries={permits} setEntries={setPermits} isCollapsed={collapsedCards.permits} onToggleCollapse={() => toggleCollapse('permits')} />,
                 overtime: <OvertimeCard entries={overtime} setEntries={setOvertime} isCollapsed={collapsedCards.overtime} onToggleCollapse={() => toggleCollapse('overtime')} />,
-                onCall: <OnCallCard entries={onCall} setEntries={setOnCall} setOnCall={setOnCall} isCollapsed={collapsedCards.onCall} onToggleCollapse={() => toggleCollapse('onCall')} />, 
+                onCall: <OnCallCard entries={onCall} setEntries={setOnCall} setOnCall={setOnCall} isCollapsed={collapsedCards.onCall} onToggleCollapse={() => toggleCollapse('onCall')} />,
                 projects: <ProjectCard entries={projects} setEntries={setProjects} isCollapsed={collapsedCards.projects} onToggleCollapse={() => toggleCollapse('projects')} />,
-                shifts: <ShiftCard pattern={profileData.shiftPattern} startDate={profileData.cycleStartDate} setStartDate={setCycleStartDate} endDate={profileData.cycleEndDate} setEndDate={setCycleEndDate} onOpenEditor={() => setIsShiftEditorOpen(true)} isCollapsed={collapsedCards.shifts} onToggleCollapse={() => toggleCollapse('shifts')} />,
-                workLocation: <WorkLocationCard workLocation={profileData.workLocation} setWorkLocation={setWorkLocation} isCollapsed={collapsedCards.workLocation} onToggleCollapse={() => toggleCollapse('workLocation')} />,
+                shifts: <ShiftCard pattern={safeProfileData.shiftPattern} startDate={safeProfileData.cycleStartDate} setStartDate={setCycleStartDate} endDate={safeProfileData.cycleEndDate} setEndDate={setCycleEndDate} onOpenEditor={() => setIsShiftEditorOpen(true)} isCollapsed={collapsedCards.shifts} onToggleCollapse={() => toggleCollapse('shifts')} />,
+                workLocation: <WorkLocationCard workLocation={safeProfileData.workLocation} setWorkLocation={setWorkLocation} isCollapsed={collapsedCards.workLocation} onToggleCollapse={() => toggleCollapse('workLocation')} />,
                 checkIn: (
                     <CheckInCard
-                        entries={profileData.checkIns}
+                        entries={safeProfileData.checkIns}
                         onDelete={handleDeleteCheckIn}
                         isCollapsed={collapsedCards.checkIn}
                         onToggleCollapse={() => toggleCollapse('checkIn')}
                         extraContent={
                             <NfcCheckInButton
-                                lastEntryType={profileData.checkIns.length > 0 ? profileData.checkIns[profileData.checkIns.length - 1].type : null}
+                                lastEntryType={safeProfileData.checkIns.length > 0 ? safeProfileData.checkIns[safeProfileData.checkIns.length - 1].type : null}
                                 onRegister={(type, context) => {
                                     handleAddCheckIn(type, context?.timestamp);
                                 }}
-                                workLocation={profileData.workLocation?.name || 'Sede principale'}
+                                workLocation={safeProfileData.workLocation?.name || 'Sede principale'}
                             />
                         }
                     />
                 ),
                 nfcReport: (
                     <NfcReportCard
-                        appointments={profileData.appointments}
+                        appointments={safeProfileData.appointments}
                         monthDate={new Date()}
                     />
                 ),
-                payroll: <PayrollCard allEvents={allEvents} settings={profileData.salarySettings} shiftPattern={parsedShiftPattern} cycleStartDate={profileData.cycleStartDate} shiftOverrides={profileData.shiftOverrides} isCollapsed={collapsedCards.payroll} onToggleCollapse={() => toggleCollapse('payroll')} />,
+                payroll: <PayrollCard allEvents={allEvents} settings={safeProfileData.salarySettings} shiftPattern={parsedShiftPattern} cycleStartDate={safeProfileData.cycleStartDate} shiftOverrides={safeProfileData.shiftOverrides} isCollapsed={collapsedCards.payroll} onToggleCollapse={() => toggleCollapse('payroll')} />,
                 reminders: <ReminderCard events={allEvents} reminderDays={reminderDays} setReminderDays={setReminderDays} notificationPermission={notificationPermission} onRequestNotificationPermission={requestNotificationPermission} isCollapsed={collapsedCards.reminders} onToggleCollapse={() => toggleCollapse('reminders')} />,
-                netSalary: <NetSalaryCalculatorCard isCollapsed={collapsedCards.netSalary} onToggleCollapse={() => toggleCollapse('netSalary')} netSalarySettings={profileData.netSalary} setNetSalarySettings={setNetSalarySettings} />,
-                salarySettings: <SalarySettingsCard settings={profileData.salarySettings} setSettings={setSalarySettings} isCollapsed={collapsedCards.salarySettings} onToggleCollapse={() => toggleCollapse('salarySettings')} />,
-                dataManagement: <DataManagementCard profileName={profileName} profileData={profileData} allEvents={allEvents} onImportData={onUpdateProfileData} isCollapsed={collapsedCards.dataManagement} onToggleCollapse={() => toggleCollapse('dataManagement')} />,
+                netSalary: <NetSalaryCalculatorCard isCollapsed={collapsedCards.netSalary} onToggleCollapse={() => toggleCollapse('netSalary')} netSalarySettings={safeProfileData.netSalary} setNetSalarySettings={setNetSalarySettings} />,
+                salarySettings: <SalarySettingsCard settings={safeProfileData.salarySettings} setSettings={setSalarySettings} isCollapsed={collapsedCards.salarySettings} onToggleCollapse={() => toggleCollapse('salarySettings')} />,
+                dataManagement: <DataManagementCard profileName={profileName} profileData={safeProfileData} allEvents={allEvents} onImportData={onUpdateProfileData} isCollapsed={collapsedCards.dataManagement} onToggleCollapse={() => toggleCollapse('dataManagement')} />,
             };
 
-            let operativeOrder = profileData.operativeCardOrder && profileData.operativeCardOrder.length > 0
-                ? [...profileData.operativeCardOrder]
+            let operativeOrder = Array.isArray(safeProfileData.operativeCardOrder) && safeProfileData.operativeCardOrder.length > 0
+                ? [...safeProfileData.operativeCardOrder]
                 : ['holidays', 'permits', 'overtime', 'onCall', 'projects', 'shifts', 'workLocation', 'checkIn', 'nfcReport'];
             if (!operativeOrder.includes('onCall')) {
                 operativeOrder.splice(3, 0, 'onCall'); // inserisci sempre in quarta posizione
             }
-            const economicOrder = profileData.economicCardOrder || ['payroll', 'reminders', 'netSalary', 'salarySettings', 'dataManagement'];
+            let economicOrder = Array.isArray(safeProfileData.economicCardOrder) && safeProfileData.economicCardOrder.length > 0
+                ? [...safeProfileData.economicCardOrder]
+                : ['payroll', 'reminders', 'netSalary', 'salarySettings', 'dataManagement'];
+            // Fallback: se economicOrder non contiene almeno una card valida, forza tutte le card economiche
+            const validEconomicKeys = ['payroll', 'reminders', 'netSalary', 'salarySettings', 'dataManagement'];
+            if (!economicOrder.some(key => validEconomicKeys.includes(key))) {
+                economicOrder = validEconomicKeys;
+            }
 
             const renderCard = (key: string) => (
                 <div
@@ -960,4 +987,4 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     </>
     </AppContext.Provider>
     );
-};
+}

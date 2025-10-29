@@ -1,15 +1,16 @@
 // Registrazione Service Worker per PWA/offline
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => {
-                console.log('Service Worker registrato con successo:', reg);
-            })
-            .catch(err => {
-                console.error('Service Worker registration failed:', err);
-            });
-    });
-}
+// DISABILITATO TEMPORANEAMENTE per forzare il browser a non usare la cache vecchia
+// if ('serviceWorker' in navigator) {
+//     window.addEventListener('load', () => {
+//         navigator.serviceWorker.register('/sw.js')
+//             .then(reg => {
+//                 console.log('Service Worker registrato con successo:', reg);
+//             })
+//             .catch(err => {
+//                 console.error('Service Worker registration failed:', err);
+//             });
+//     });
+// }
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppWithDebug } from './App';

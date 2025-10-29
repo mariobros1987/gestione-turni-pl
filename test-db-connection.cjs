@@ -1,7 +1,9 @@
 // Test connessione database
 const { PrismaClient } = require('@prisma/client')
 
-const DATABASE_URL = "postgresql://postgres:040787Milan$!@db.uzjrbebtanilxxxrsfpj.supabase.co:5432/postgres?sslmode=require"
+
+require('dotenv').config();
+const DATABASE_URL = process.env.DATABASE_URL;
 
 const prisma = new PrismaClient({
   datasources: {
@@ -31,7 +33,6 @@ async function testConnection() {
       select: {
         id: true,
         email: true,
-        username: true,
         createdAt: true
       }
     })

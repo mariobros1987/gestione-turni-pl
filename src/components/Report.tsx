@@ -83,7 +83,7 @@ export const Report: React.FC<ReportProps> = ({ allEvents, profileData }) => {
         return { usedHolidaysInRange, overtimeByMonth, permitsByCategory, totalPermitHours };
     }, [startDate, endDate, allEvents]);
     
-    const usedHolidaysTotal = profileData.holidays.reduce((sum, entry) => sum + entry.value, 0);
+    const usedHolidaysTotal = (profileData.holidays || []).reduce((sum, entry) => sum + entry.value, 0);
     const remainingHolidaysTotal = (profileData.totalCurrentYearHolidays + profileData.totalPreviousYearsHolidays) - usedHolidaysTotal;
 
     const maxOvertimeValue = useMemo(() => {

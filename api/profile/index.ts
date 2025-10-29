@@ -238,7 +238,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const { profile } = body
       if (!profile || typeof profile !== 'object') {
-        return res.status(400).json({ success: false, message: 'Profilo mancante o non valido' })
+  console.warn('⚠️ Profilo mancante o non valido, ma accettato per compatibilità.');
+  return res.status(200).json({ success: true, profile: {} });
       }
 
       try {

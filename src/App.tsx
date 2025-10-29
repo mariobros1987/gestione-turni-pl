@@ -42,7 +42,9 @@ const App: React.FC = () => {
   };
 
   const ensureProfileForUser = (data: ProfileData, profileKey: string): ProfileData => {
-    return data.onCallFilterName === profileKey ? data : { ...data, onCallFilterName: profileKey };
+  const normalized = data.onCallFilterName === profileKey ? data : { ...data, onCallFilterName: profileKey };
+  console.log('[DEBUG] ensureProfileForUser - profilo normalizzato:', normalized);
+  return normalized;
   };
 
   const applyProfileSnapshot = (
