@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const insertData = {
-    userId: userId,
+    user_id: userId,  // ⚠️ Supabase usa user_id (snake_case)
     azione: type,
     timestamp: timestamp || new Date().toISOString(),
     serial_number: serialNumber || null

@@ -92,7 +92,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 const { data, error } = await supabase
                     .from('checkin')
                     .select('*')
-                    .eq('userId', user.id)
+                    .eq('user_id', user.id)  // ⚠️ Supabase usa user_id (snake_case)
                     .order('timestamp', { ascending: true });
                 console.log('DEBUG CHECKIN QUERY userId:', user.id, 'Risultato:', data, 'Errore:', error);
                 if (error) return;
@@ -526,15 +526,58 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
 
     }, [holidays, setHolidays]);
 
-    const handleAddCheckIn = (type: 'entrata' | 'uscita', customTimestamp?: Date) => {
-    const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
-    // Normalizzazione difensiva per appointments
-    const safeAppointments = Array.isArray(profileData.appointments) ? profileData.appointments : [];
+    const handleAddCheckIn = async (type: 'entrata' | 'uscita', customTimestamp?: Date) => {
+        const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
+        // Normalizzazione difensiva per appointments
+        const safeAppointments = Array.isArray(profileData.appointments) ? profileData.appointments : [];
+        
         if (type === 'entrata') {
-            // Salva solo in stato temporaneo, NON visualizzare nel calendario
-            setPendingNfcEntry({ id: timestamp, timestamp, type });
+            // Crea il check-in entrata
+            const newCheckIn: CheckInEntry = {
+                id: `checkin-${Date.now()}`,
+                timestamp,
+                type: 'entrata'
+            };
+            
+            // Salva in Supabase
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const response = await fetch('/api/checkin', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            type: 'entrata',
+                            timestamp,
+                            serialNumber: null
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        console.error('❌ Errore salvataggio check-in entrata:', await response.text());
+                    } else {
+                        console.log('✅ Check-in entrata salvato in Supabase');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Errore chiamata API check-in:', error);
+            }
+            
+            // Salva in stato locale e profilo
+            const updatedCheckIns = [...(profileData.checkIns || []), newCheckIn];
+            setCheckIns(updatedCheckIns);
+            
+            // Salva anche come stato temporaneo per abbinamento con uscita
+            setPendingNfcEntry({ id: newCheckIn.id, timestamp, type });
+            
+            console.log('✅ Check-in entrata registrato:', newCheckIn);
+            
         } else if (type === 'uscita') {
             let entrataRef = pendingNfcEntry && pendingNfcEntry.type === 'entrata' ? pendingNfcEntry : null;
+            
             // Se non c'è pendingNfcEntry, cerca l'ultimo check-in di tipo 'entrata' tra i checkIns
             if (!entrataRef) {
                 const lastEntrata = Array.isArray(profileData.checkIns)
@@ -544,10 +587,50 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                     entrataRef = { id: lastEntrata.id, timestamp: lastEntrata.timestamp, type: 'entrata' };
                 }
             }
+            
             if (!entrataRef) {
-                console.warn('Non puoi registrare una uscita senza una entrata NFC aperta o precedente.');
+                console.warn('⚠️ Non puoi registrare una uscita senza una entrata precedente.');
                 return;
             }
+            
+            // Crea il check-in uscita
+            const newCheckIn: CheckInEntry = {
+                id: `checkin-${Date.now()}`,
+                timestamp,
+                type: 'uscita'
+            };
+            
+            // Salva in Supabase
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    const response = await fetch('/api/checkin', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            type: 'uscita',
+                            timestamp,
+                            serialNumber: null
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        console.error('❌ Errore salvataggio check-in uscita:', await response.text());
+                    } else {
+                        console.log('✅ Check-in uscita salvato in Supabase');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Errore chiamata API check-in:', error);
+            }
+            
+            // Salva in stato locale
+            const updatedCheckIns = [...(profileData.checkIns || []), newCheckIn];
+            setCheckIns(updatedCheckIns);
+            
             // Crea evento unico "Presenza" con orario entrata/uscita
             const tEntrata = new Date(entrataRef.timestamp);
             const tUscita = customTimestamp ? customTimestamp : new Date();
@@ -555,6 +638,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             const endTime = tUscita.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
             const dateStr = tEntrata.toISOString().split('T')[0];
             const oreLavorate = (tUscita.getTime() - tEntrata.getTime()) / (1000 * 60 * 60);
+            
             const newAppointment = {
                 id: `${entrataRef.id}-${timestamp}-presenza`,
                 date: dateStr,
@@ -565,8 +649,11 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 endTime,
                 value: parseFloat(oreLavorate.toFixed(2)),
             };
+            
             setAppointments([...safeAppointments, newAppointment]);
             setPendingNfcEntry(null);
+            
+            console.log('✅ Check-in uscita registrato e presenza creata:', newAppointment);
         }
     };
 
