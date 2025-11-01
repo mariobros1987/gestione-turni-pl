@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Gestione Turni P.L.</title>
+    <style>
+        :root {
+            --primary-color: #005A9C;
+            --background-color: #f4f7fc;
+            --card-background-color: #ffffff;
+            --text-color: #333333;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary-color: #4dabf7;
+                --background-color: #121212;
+                --card-background-color: #1e1e1e;
+                --text-color: #e0e0e0;
+            }
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            text-align: center;
+        }
+        .container {
+            background-color: var(--card-background-color);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            max-width: 500px;
+        }
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        p {
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sei Offline</h1>
+        <p>Sembra che tu non sia connesso a Internet. I contenuti precedentemente caricati potrebbero essere disponibili, ma non è possibile accedere a nuove risorse.</p>
+        <p>Controlla la tua connessione e riprova.</p>
+    </div>
+</body>
+</html>

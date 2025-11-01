@@ -3,10 +3,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Usa la service role key per bypassare RLS
-  const supabase: SupabaseClient = createClient(
-    process.env.VITE_SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string
-  )
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('Missing Supabase env vars:', { url: !!supabaseUrl, key: !!serviceRoleKey })
+    return res.status(500).json({ success: false, message: 'Configurazione Supabase mancante' })
+  }
+  
+  const supabase: SupabaseClient = createClient(supabaseUrl, serviceRoleKey)
 
   if (req.method === 'GET') {
     try {

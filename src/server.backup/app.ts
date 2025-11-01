@@ -437,47 +437,118 @@ if (process.env.NODE_ENV !== 'production') {
 // Tutto il blocco funzioni e route DOPO la dichiarazione di app, i middleware e tutte le altre route, subito prima di app.listen
 
 // GET /api/profile - restituisce il profilo dell'utente autenticato
+// Helpers minimi per default profilo e sanitizzazione
+const DEFAULT_PROFILE_NAME = 'primary';
+function getDefaultProfileData(profileKey: string) {
+  return {
+    holidays: [],
+    permits: [],
+    overtime: [],
+    onCall: [],
+    projects: [],
+    appointments: [],
+    shiftOverrides: {},
+    workLocation: null,
+    checkIns: [],
+    totalCurrentYearHolidays: 0,
+    totalPreviousYearsHolidays: 0,
+    onCallFilterName: profileKey,
+    shiftPattern: '',
+    shiftDefinitions: {},
+    cycleStartDate: new Date().toISOString().split('T')[0],
+    cycleEndDate: null,
+    salarySettings: { baseRate: 20, overtimeDiurnoRate: 15, overtimeNotturnoRate: 30, overtimeFestivoRate: 50, onCallFerialeRate: 2.5, onCallFestivaRate: 5, projectRate: 25 },
+    netSalary: { ral: 28000, addRegionale: 1.73, addComunale: 0.9, detrazioniFamiliari: 0, bonusIrpef: 0 },
+    reminderDays: 7,
+    sentNotifications: [],
+    view: 'dashboard',
+    calendarFilters: { ferie: true, permessi: true, straordinario: true, reperibilita: true, progetto: true, appuntamento: true, shifts: true },
+    collapsedCards: { holidays: false, permits: false, overtime: false, onCall: false, projects: false, shifts: true, salarySettings: true, payroll: false, netSalary: true, reminders: false, dataManagement: true, workLocation: true, checkIn: true },
+    operativeCardOrder: ['holidays','permits','overtime','onCall','projects','shifts','workLocation','checkIn'],
+    economicCardOrder: ['payroll','reminders','netSalary','salarySettings','dataManagement'],
+    dashboardLayout: [
+      { id: 'w_ai_insights', type: 'aiInsights' },
+      { id: 'w_holidays', type: 'remainingHolidays' },
+      { id: 'w_overtime', type: 'overtimeHoursThisMonth' },
+      { id: 'w_permits', type: 'permitHoursThisMonth' },
+      { id: 'w_projects', type: 'projectHoursThisMonth' },
+      { id: 'w_reminders', type: 'reminders' }
+    ]
+  };
+}
+
 app.get('/api/profile', async (req: Request, res: Response) => {
   const { decoded, error } = verifyJWT(req);
   if (error) return res.status(401).json({ success: false, message: error });
-  const userId = decoded && (decoded.id as string | undefined) || (decoded && (decoded as any).userId);
+  const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
   if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      firstName: true,
-      lastName: true,
-      badgeNumber: true,
-      department: true,
-      rank: true,
-      phoneNumber: true,
-      isActive: true,
-      isVerified: true,
-      createdAt: true,
-      lastLogin: true
+
+  try {
+    const profileKey = (decoded as any).email?.toLowerCase() || `user-${userId}`;
+    const existing = await prisma.profile.findFirst({
+      where: { userId, isActive: true },
+      orderBy: { updatedAt: 'desc' }
+    });
+    const data = existing?.data ?? getDefaultProfileData(profileKey);
+
+    // Se non esiste un profilo 'primary', crealo
+    if (!existing || existing.name !== DEFAULT_PROFILE_NAME) {
+      await prisma.profile.upsert({
+        where: { userId_name: { userId, name: DEFAULT_PROFILE_NAME } },
+        update: { data, isActive: true, updatedAt: new Date() },
+        create: { userId, name: DEFAULT_PROFILE_NAME, data, isActive: true }
+      });
+      if (existing && existing.name !== DEFAULT_PROFILE_NAME) {
+        await prisma.profile.updateMany({
+          where: { userId, name: { not: DEFAULT_PROFILE_NAME } },
+          data: { isActive: false, updatedAt: new Date() }
+        });
+      }
     }
-  });
-  if (!user) return res.status(404).json({ success: false, message: 'Utente non trovato' });
-  res.json({ success: true, user });
+
+    return res.json({ success: true, profile: data });
+  } catch (e) {
+    const msg = (e && typeof e === 'object' && 'message' in e) ? (e as any).message : String(e);
+    return res.status(500).json({ success: false, message: 'Errore lettura profilo', error: msg });
+  }
 });
 
 // POST /api/profile - aggiorna il profilo dell'utente autenticato
 app.post('/api/profile', async (req: Request, res: Response) => {
   const { decoded, error } = verifyJWT(req);
   if (error) return res.status(401).json({ success: false, message: error });
-  const userId = decoded && (decoded.id as string | undefined) || (decoded && (decoded as any).userId);
+  const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
   if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
-  const allowedFields = [
-    'firstName', 'lastName', 'badgeNumber', 'department', 'rank', 'phoneNumber'
-  ];
-  const data: Record<string, string> = {};
-  for (const field of allowedFields) {
-    if (typeof req.body[field] === 'string') {
-      data[field] = req.body[field].trim();
+
+  // Supporta sia { profile: {...} } (nuovo) sia campi utente piatti (legacy)
+  let body: any = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+
+  if (body && typeof body.profile === 'object') {
+    try {
+      const profileKey = (decoded as any).email?.toLowerCase() || `user-${userId}`;
+      const profileData = body.profile;
+      await prisma.profile.upsert({
+        where: { userId_name: { userId, name: DEFAULT_PROFILE_NAME } },
+        update: { data: profileData, isActive: true, updatedAt: new Date() },
+        create: { userId, name: DEFAULT_PROFILE_NAME, data: profileData, isActive: true }
+      });
+      await prisma.profile.updateMany({
+        where: { userId, name: { not: DEFAULT_PROFILE_NAME } },
+        data: { isActive: false, updatedAt: new Date() }
+      });
+      return res.json({ success: true, profile: profileData });
+    } catch (err) {
+      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
+      return res.status(500).json({ success: false, message: 'Errore salvataggio profilo', error: msg });
     }
+  }
+
+  // Fallback legacy: aggiornamento dati utente di base
+  const allowedFields = ['firstName','lastName','badgeNumber','department','rank','phoneNumber'];
+  const data: Record<string,string> = {};
+  for (const field of allowedFields) {
+    if (typeof body?.[field] === 'string') data[field] = String(body[field]).trim();
   }
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ success: false, message: 'Nessun campo valido da aggiornare' });
@@ -486,26 +557,12 @@ app.post('/api/profile', async (req: Request, res: Response) => {
     const updated = await prisma.user.update({
       where: { id: userId },
       data,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        badgeNumber: true,
-        department: true,
-        rank: true,
-        phoneNumber: true,
-        isActive: true,
-        isVerified: true,
-        createdAt: true,
-        lastLogin: true
-      }
+      select: { id: true, email: true, name: true, firstName: true, lastName: true, badgeNumber: true, department: true, rank: true, phoneNumber: true, isActive: true, isVerified: true, createdAt: true, lastLogin: true }
     });
-    res.json({ success: true, user: updated });
+    return res.json({ success: true, user: updated });
   } catch (err) {
     const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
-    res.status(500).json({ success: false, message: 'Errore aggiornamento profilo', error: msg });
+    return res.status(500).json({ success: false, message: 'Errore aggiornamento profilo', error: msg });
   }
 });
 
