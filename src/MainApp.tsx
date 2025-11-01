@@ -139,6 +139,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     }, [profileData.appointments, setAppointments]);
     // Rileva parametro azione NFC dall'URL
     const [azioneNfc, setAzioneNfc] = useState<string | null>(null);
+    const [nfcAutoExecuted, setNfcAutoExecuted] = useState(false);
+    
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const azione = params.get('azione');
@@ -148,6 +150,23 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             setAzioneNfc(null);
         }
     }, []);
+
+    // Auto-esegui check-in se viene da NFC
+    useEffect(() => {
+        if (azioneNfc && !nfcAutoExecuted && profileData) {
+            console.log(`🏷️ NFC rilevato: auto-registrazione ${azioneNfc}...`);
+            handleAddCheckIn(azioneNfc as 'entrata' | 'uscita');
+            setNfcAutoExecuted(true);
+            
+            // Mostra notifica e rimuovi parametro URL dopo 2 secondi
+            setTimeout(() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('azione');
+                window.history.replaceState({}, '', url.toString());
+                setAzioneNfc(null);
+            }, 2000);
+        }
+    }, [azioneNfc, nfcAutoExecuted, profileData]);
     React.useEffect(() => {
         console.log('DEBUG MainApp - Array completo delle reperibilità:', profileData.onCall);
     }, [profileData.onCall]);
@@ -987,17 +1006,21 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         <>
             {/* Se l'URL contiene ?azione=entrata o ?azione=uscita mostra i pulsanti NFC */}
             {azioneNfc && (
-                <div style={{ background: '#e3f7e3', border: '1px solid #2e7d32', padding: 16, borderRadius: 8, margin: '16px 0' }}>
-                    <h3>Registrazione NFC: {azioneNfc === 'entrata' ? 'Entrata' : 'Uscita'}</h3>
-                    <button
-                        style={{ padding: '8px 16px', fontSize: 16, background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                        onClick={() => {
-                            handleAddCheckIn(azioneNfc as 'entrata' | 'uscita');
-                            alert(`Registrazione ${azioneNfc} effettuata!`);
-                        }}
-                    >
-                        Registra {azioneNfc}
-                    </button>
+                <div style={{ 
+                    background: '#e3f7e3', 
+                    border: '2px solid #2e7d32', 
+                    padding: '20px', 
+                    borderRadius: '12px', 
+                    margin: '16px 0',
+                    textAlign: 'center',
+                    animation: 'fadeIn 0.3s ease-in'
+                }}>
+                    <h2 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
+                        ✅ {azioneNfc === 'entrata' ? 'Entrata' : 'Uscita'} Registrata!
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#555' }}>
+                        Check-in salvato automaticamente via NFC
+                    </p>
                 </div>
             )}
             <header>
