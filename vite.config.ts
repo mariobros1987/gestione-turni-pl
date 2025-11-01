@@ -12,7 +12,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         // Solo fallback offline per produzione, non per sviluppo
         navigateFallback: 'offline.html',
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: [
+          /^\/api/,           // Escludi API
+          /\?azione=/         // Escludi URL con parametro ?azione= (NFC)
+        ],
         // Strategia di cache per l'app
         runtimeCaching: [
           {
