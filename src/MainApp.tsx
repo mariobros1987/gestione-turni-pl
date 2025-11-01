@@ -92,7 +92,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 const { data, error } = await supabase
                     .from('checkin')
                     .select('*')
-                    .eq('user_id', user.id)  // ⚠️ Supabase usa user_id (snake_case)
+                    .eq('userId', user.id)  // ✅ Supabase usa userId (camelCase)
                     .order('timestamp', { ascending: true });
                 console.log('DEBUG CHECKIN QUERY userId:', user.id, 'Risultato:', data, 'Errore:', error);
                 if (error) return;
@@ -175,7 +175,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         if (azioneNfc && !nfcAutoExecuted && profileData) {
             console.log(`🏷️ NFC rilevato: auto-registrazione ${azioneNfc}...`);
             console.log('📊 ProfileData disponibile:', !!profileData);
-            console.log('🔐 Token presente:', !!localStorage.getItem('token'));
+            console.log('🔐 Token presente:', !!localStorage.getItem('turni_pl_auth_token'));
             
             // Esegui il check-in
             handleAddCheckIn(azioneNfc as 'entrata' | 'uscita');
@@ -587,7 +587,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             
             // Salva in Supabase
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('turni_pl_auth_token');
                 if (token) {
                     const response = await fetch('/api/checkin', {
                         method: 'POST',
@@ -648,7 +648,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             
             // Salva in Supabase
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('turni_pl_auth_token');
                 if (token) {
                     const response = await fetch('/api/checkin', {
                         method: 'POST',
