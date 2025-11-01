@@ -144,27 +144,54 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const azione = params.get('azione');
+        console.log('🏷️ NFC URL rilevato:', window.location.search, 'Parametro azione:', azione);
+        
         if (azione === 'entrata' || azione === 'uscita') {
+            console.log('✅ Azione NFC valida:', azione);
             setAzioneNfc(azione);
+        } else if (azione === 'auto') {
+            // Modalità automatica: decide in base all'ultimo check-in
+            console.log('🤖 Modalità AUTO rilevata, controllo ultimo check-in...');
+            const lastCheckIn = profileData.checkIns && profileData.checkIns.length > 0
+                ? [...profileData.checkIns].sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  )[0]
+                : null;
+            
+            if (!lastCheckIn || lastCheckIn.type === 'uscita') {
+                console.log('➡️ AUTO: Ultimo check-in è uscita o assente → registro ENTRATA');
+                setAzioneNfc('entrata');
+            } else {
+                console.log('⬅️ AUTO: Ultimo check-in è entrata → registro USCITA');
+                setAzioneNfc('uscita');
+            }
         } else {
             setAzioneNfc(null);
         }
-    }, []);
+    }, [profileData.checkIns]);
 
     // Auto-esegui check-in se viene da NFC
     useEffect(() => {
         if (azioneNfc && !nfcAutoExecuted && profileData) {
             console.log(`🏷️ NFC rilevato: auto-registrazione ${azioneNfc}...`);
+            console.log('📊 ProfileData disponibile:', !!profileData);
+            console.log('🔐 Token presente:', !!localStorage.getItem('token'));
+            
+            // Esegui il check-in
             handleAddCheckIn(azioneNfc as 'entrata' | 'uscita');
             setNfcAutoExecuted(true);
             
-            // Mostra notifica e rimuovi parametro URL dopo 2 secondi
+            console.log(`✅ Check-in ${azioneNfc} eseguito!`);
+            
+            // Mostra notifica e rimuovi parametro URL dopo 3 secondi
             setTimeout(() => {
+                console.log('🧹 Rimozione parametro URL...');
                 const url = new URL(window.location.href);
                 url.searchParams.delete('azione');
                 window.history.replaceState({}, '', url.toString());
                 setAzioneNfc(null);
-            }, 2000);
+                setNfcAutoExecuted(false); // Reset per permettere nuove scansioni
+            }, 3000);
         }
     }, [azioneNfc, nfcAutoExecuted, profileData]);
     React.useEffect(() => {
