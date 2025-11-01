@@ -252,17 +252,17 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
     let eventoExtra = null;
     if (type === 'uscita' && lastEntrataTimestamp) {
       oreLavorate = (timestamp.getTime() - lastEntrataTimestamp.getTime()) / (1000 * 60 * 60);
-      // Orario standard: 8 ore
-      if (oreLavorate > 8) {
-        straordinario = oreLavorate - 8;
+      // Orario standard: 6 ore
+      if (oreLavorate > 6) {
+        straordinario = oreLavorate - 6;
         eventoExtra = {
           tipo: 'straordinario',
           value: straordinario,
           startTime: lastEntrataTimestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
           endTime: timestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         };
-      } else if (oreLavorate < 8) {
-        permesso = 8 - oreLavorate;
+      } else if (oreLavorate < 6) {
+        permesso = 6 - oreLavorate;
         eventoExtra = {
           tipo: 'permesso',
           value: permesso,

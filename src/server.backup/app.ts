@@ -11,6 +11,7 @@ import express, { Request, Response } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { hashPassword, verifyPassword, validateEmail, validatePassword } from '../lib/auth-utils';
+import { createClient } from '@supabase/supabase-js';
 
 
 const app = express();
@@ -165,6 +166,93 @@ app.get('/api/users', async (req, res) => {
     res.json({ success: true, users, count: users.length, timestamp: new Date().toISOString() });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Errore interno del server', timestamp: new Date().toISOString() });
+  }
+});
+
+
+// --- CHECK-IN (locale) ---
+// Replica dell'endpoint serverless /api/checkin per lo sviluppo locale
+app.post('/api/checkin', async (req: Request, res: Response) => {
+  try {
+    console.log('[local] POST /api/checkin received');
+    // Verifica JWT ed estrae userId
+    const { decoded, error } = verifyJWT(req);
+    if (error) return res.status(401).json({ success: false, message: error });
+    const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
+    if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
+
+    const { type, timestamp, serialNumber } = (req.body || {}) as {
+      type?: string;
+      timestamp?: string;
+      serialNumber?: string | null;
+    };
+    if (!type || !['entrata', 'uscita'].includes(type)) {
+      return res.status(400).json({ success: false, message: 'Tipo di check-in non valido' });
+    }
+
+    // Inserimento via Prisma (affidabile in locale, evita dipendenza da chiave service role)
+    console.log('[checkin] Creating with userId:', userId, 'type:', type);
+    const created = await prisma.checkin.create({
+      data: {
+        userId: String(userId),
+        azione: type,
+        timestamp: new Date(timestamp || new Date().toISOString()),
+        tag_content: serialNumber || null
+      }
+    });
+
+    return res.status(200).json({ success: true, checkIn: created });
+  } catch (err) {
+    const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
+    return res.status(500).json({ success: false, message: 'Local checkin error', error: msg });
+  }
+});
+
+
+// Lista check-in dell'utente corrente (locale)
+app.get('/api/checkin', async (req: Request, res: Response) => {
+  try {
+    const { decoded, error } = verifyJWT(req);
+    if (error) return res.status(401).json({ success: false, message: error });
+    const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
+    if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
+
+    const checkIns = await prisma.checkin.findMany({
+      where: ({ userId: String(userId) } as any),
+      orderBy: { timestamp: 'asc' }
+    });
+
+    return res.status(200).json({ success: true, checkIns });
+  } catch (err) {
+    const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
+    return res.status(500).json({ success: false, message: 'Errore recupero check-in', error: msg });
+  }
+});
+
+// Cancella i check-in della giornata (locale)
+console.log('[routes] registering DELETE /api/checkin');
+app.delete('/api/checkin', async (req: Request, res: Response) => {
+  try {
+    const { decoded, error } = verifyJWT(req);
+    if (error) return res.status(401).json({ success: false, message: error });
+    const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
+    if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
+
+    let body: any = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+    const date = (req.query?.date as string) || body?.date;
+    if (!date) return res.status(400).json({ success: false, message: 'Parametro date mancante (YYYY-MM-DD)' });
+
+    const from = new Date(`${date}T00:00:00.000Z`);
+    const to = new Date(`${date}T23:59:59.999Z`);
+
+    const result = await prisma.checkin.deleteMany({
+      where: ({ userId: String(userId), timestamp: { gte: from, lte: to } } as any)
+    });
+    return res.status(200).json({ success: true, deleted: result.count });
+  } catch (err) {
+    const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
+    return res.status(500).json({ success: false, message: 'Errore cancellazione check-in', error: msg });
   }
 });
 
@@ -592,11 +680,6 @@ app.get('/api/profiles', async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' }
   });
   res.json({ success: true, users });
-});
-
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server avviato su http://localhost:${PORT}`);
 });
 
 export { app };

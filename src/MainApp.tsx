@@ -85,17 +85,21 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         let polling = true;
         async function fetchCheckInsAndSyncAppointments() {
             try {
-                const { supabase } = await import('./lib/supabase');
-                const userJson = localStorage.getItem('turni_pl_current_user');
-                const user = userJson ? JSON.parse(userJson) : null;
-                if (!user) return;
-                const { data, error } = await supabase
-                    .from('checkin')
-                    .select('*')
-                    .eq('userId', user.id)  // ✅ Supabase usa userId (camelCase)
-                    .order('timestamp', { ascending: true });
-                console.log('DEBUG CHECKIN QUERY userId:', user.id, 'Risultato:', data, 'Errore:', error);
-                if (error) return;
+                const token = localStorage.getItem('turni_pl_auth_token');
+                if (!token) return;
+                const resp = await fetch('/api/checkin', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    cache: 'no-store'
+                });
+                if (!resp.ok) {
+                    console.warn('Fetch check-in fallita, status:', resp.status);
+                    return;
+                }
+                const json = await resp.json();
+                const data = json?.checkIns || [];
+                console.log('DEBUG CHECKIN QUERY via API, Risultato:', data);
                 // Raggruppa per giorno e crea appuntamenti "Presenza"
                 const byDay: Record<string, { entrata?: any; uscita?: any }> = {};
                 for (const entry of data) {
@@ -497,17 +501,26 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             // Elimina anche i check-in NFC dal database
             const presenza = appointments.find(a => a.id === id && a.title === 'Presenza');
             if (presenza) {
+                const conferma = window.confirm(
+                    `Eliminando questa presenza verranno cancellati anche i check-in di entrata e uscita del ${presenza.date}.\n\nConfermi l'eliminazione?`
+                );
+                if (!conferma) return;
+                
                 (async () => {
-                    const { supabase } = await import('./lib/supabase');
-                    const userJson = localStorage.getItem('turni_pl_current_user');
-                    const user = userJson ? JSON.parse(userJson) : null;
-                    if (user) {
-                                                await supabase
-                                                    .from('checkin')
-                                                    .delete()
-                                                    .eq('userId', user.id)
-                                                    .gte('timestamp', `${presenza.date}T00:00:00`)
-                                                    .lte('timestamp', `${presenza.date}T23:59:59`);
+                    try {
+                        const token = localStorage.getItem('turni_pl_auth_token');
+                        if (token) {
+                            await fetch('/api/checkin', {
+                                method: 'DELETE',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ date: presenza.date })
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Errore cancellazione check-in server-side:', e);
                     }
                 })();
             }
