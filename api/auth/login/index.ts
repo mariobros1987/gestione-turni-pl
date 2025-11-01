@@ -47,11 +47,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: 'Metodo non supportato' 
     })
   }
+
+  // Verifica DATABASE_URL
+  if (!process.env.DATABASE_URL) {
+    console.error('[LOGIN] DATABASE_URL non configurata!')
+    return res.status(500).json({
+      success: false,
+      message: 'Configurazione database mancante'
+    })
+  }
+
   try {
     const { email, password } = req.body
 
+    console.log('[LOGIN] Tentativo login per:', email)
+
     // Validazioni base
     if (!email || !password) {
+      console.log('[LOGIN] Credenziali mancanti')
       return res.status(400).json({
         success: false, 
         message: 'Email e password sono obbligatori' 
@@ -59,6 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!validateEmail(email)) {
+      console.log('[LOGIN] Email non valida:', email)
       return res.status(400).json({
         success: false, 
         message: 'Email non valida' 
@@ -66,6 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Cerca utente
+    console.log('[LOGIN] Ricerca utente nel database...')
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
       select: {
@@ -87,16 +102,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     if (!user) {
+      console.log('[LOGIN] Utente non trovato:', email)
       return res.status(401).json({
         success: false, 
         message: 'Email o password non corretti' 
       })
     }
 
+    console.log('[LOGIN] Utente trovato, verifica password...')
     // Verifica password
     const isPasswordValid = await verifyPassword(password, user.passwordHash)
     
     if (!isPasswordValid) {
+      console.log('[LOGIN] Password non valida per:', email)
       return res.status(401).json({
         success: false, 
         message: 'Email o password non corretti' 
@@ -104,11 +122,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!user.isActive) {
+      console.log('[LOGIN] Account disattivato:', email)
       return res.status(403).json({
         success: false, 
         message: 'Account disattivato. Contatta l\'amministratore.' 
       })
     }
+
+    console.log('[LOGIN] Login riuscito per:', email)
 
     // Aggiorna ultimo login
     await prisma.user.update({
@@ -135,10 +156,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
   } catch (error) {
-    console.error('Errore durante il login:', error)
+    console.error('[LOGIN] Errore durante il login:', error)
+    console.error('[LOGIN] Stack:', error instanceof Error ? error.stack : 'N/A')
     return res.status(500).json({
       success: false, 
-      message: 'Errore interno del server' 
+      message: 'Errore interno del server',
+      error: error instanceof Error ? error.message : String(error)
     })
   }
 }
