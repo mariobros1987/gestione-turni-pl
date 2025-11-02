@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, DragEvent } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, DragEvent } from 'react';
 import { AppContext } from './AppContext';
 import { ProfileData, AllEntryTypes, HolidayEntry, ShiftOverride, CheckInEntry, AppointmentEntry, OnCallEntry } from './types/types';
 import { PayrollCard } from './components/PayrollCard';
@@ -84,8 +84,11 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const setNfcAutoScope = createSetter('nfcAutoScope');
 
     // --- ORA il blocco useEffect che usa setAppointments ---
+    const syncCheckInsRef = useRef<() => Promise<void>>();
+    
     useEffect(() => {
         let polling = true;
+        
         async function fetchCheckInsAndSyncAppointments() {
             try {
                 const token = localStorage.getItem('turni_pl_auth_token');
@@ -138,6 +141,10 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 }
             } catch {}
         }
+        
+        // Esponi la funzione tramite ref
+        syncCheckInsRef.current = fetchCheckInsAndSyncAppointments;
+        
         fetchCheckInsAndSyncAppointments();
         const interval = setInterval(() => {
             if (polling) fetchCheckInsAndSyncAppointments();
@@ -799,6 +806,15 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             setPendingNfcEntry(null);
             
             console.log('✅ Check-in uscita registrato e presenza creata. Appointments totali:', safeAppointments.length + 1);
+            
+            // Forza un refresh immediato per sincronizzare con il DB
+            setTimeout(() => {
+                if (syncCheckInsRef.current) {
+                    syncCheckInsRef.current().then(() => {
+                        console.log('🔄 Sincronizzazione check-in completata dopo uscita');
+                    });
+                }
+            }, 1000);
         }
     };
 
