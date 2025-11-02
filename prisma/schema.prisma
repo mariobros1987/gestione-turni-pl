@@ -117,12 +117,13 @@ model Event {
   @@map("events")
 }
 
-model checkin {
-  id          Int      @id @default(autoincrement())
-  userId      String
-  azione      String
-  timestamp   DateTime @db.Timestamptz(6)
-  tag_content String?
+model CheckIn {
+  id            Int      @id @default(autoincrement())
+  userId        String
+  type          String
+  timestamp     DateTime @db.Timestamptz(6)
+  serialNumber  String?
+  rawPayload    String?
   
   @@map("checkin")
 }
