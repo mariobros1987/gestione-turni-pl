@@ -69,8 +69,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     userId: userId,  // ✅ Supabase usa userId (camelCase)
     azione: type,
     timestamp: timestamp || new Date().toISOString(),
-    serial_number: serialNumber || null
-  };
+    // La colonna corretta in DB è "tag_content" (non serial_number)
+    tag_content: serialNumber || null
+  } as const;
 
   const { data, error } = await supabase
     .from('checkin')
