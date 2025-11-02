@@ -172,6 +172,7 @@ export interface ProfileData {
     // Preferenze NFC e conteggio ore
     overtimeThresholdHours?: number; // soglia ore standard (default 6)
     nfcAutoScope?: 'today' | 'all'; // ambito decisione auto (default 'today')
+    nfcCooldownMinutes?: number; // durata cooldown dopo lettura NFC (default 30)
 }
 
 // --- PROPS GENERICHE PER LE CARD ---

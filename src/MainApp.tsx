@@ -79,6 +79,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const setOperativeCardOrder = createSetter('operativeCardOrder');
     const setEconomicCardOrder = createSetter('economicCardOrder');
     const setDashboardLayout = createSetter('dashboardLayout');
+    const setNfcCooldownMinutes = createSetter('nfcCooldownMinutes');
     const setOvertimeThresholdHours = createSetter('overtimeThresholdHours');
     const setNfcAutoScope = createSetter('nfcAutoScope');
 
@@ -148,7 +149,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const [nfcAutoExecuted, setNfcAutoExecuted] = useState(false);
     const [lastNfcTimestamp, setLastNfcTimestamp] = useState<number>(0);
     const [nfcCooldownMessage, setNfcCooldownMessage] = useState<string | null>(null);
-    const NFC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minuti di protezione anti-doppia lettura
+    // Cooldown configurabile: nfcCooldownMinutes (default 30)
+    const NFC_COOLDOWN_MS = Math.max(0, Number((profileData as any).nfcCooldownMinutes ?? 30)) * 60 * 1000;
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -163,7 +165,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             setNfcCooldownMessage(`Attendi altri ${minutesRemaining} minuti prima del prossimo check-in`);
             setTimeout(() => setNfcCooldownMessage(null), 5000);
             setAzioneNfc(null);
-    setNfcCooldownMessage(null);
+        setNfcCooldownMessage(null);
             return;
         }
 
@@ -188,16 +190,28 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         if (resp.ok) {
                             const json = await resp.json();
                             const list: Array<{ azione: string; timestamp: string } & any> = json?.checkIns || [];
-                            // Applica lo scope configurabile: 'today' (default) oppure 'all'
-                            let source = list;
-                            if ((profileData as any).nfcAutoScope !== 'all') {
-                                const today = new Date();
-                                const yyyy = today.getFullYear();
-                                const mm = String(today.getMonth() + 1).padStart(2, '0');
-                                const dd = String(today.getDate()).padStart(2, '0');
-                                const todayStr = `${yyyy}-${mm}-${dd}`;
-                                source = list.filter(e => (e.timestamp || '').startsWith(todayStr));
+
+                            // Intervallo del giorno locale [start, end)
+                            const startOfDay = new Date();
+                            startOfDay.setHours(0, 0, 0, 0);
+                            const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+                            const isToday = (iso: string) => {
+                                const t = new Date(iso).getTime();
+                                return t >= startOfDay.getTime() && t < endOfDay.getTime();
+                            };
+
+                            const todays = list.filter(e => isToday(e.timestamp || ''));
+
+                            let source: typeof list = [];
+                            if ((profileData as any).nfcAutoScope === 'all') {
+                                // Se oggi non c'è nulla, forziamo ENTRATA (source vuoto)
+                                source = todays.length > 0 ? todays : [];
+                            } else {
+                                // Solo oggi
+                                source = todays;
                             }
+
                             const ordered = source.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
                             if (ordered[0]) {
                                 latest = { type: ordered[0].azione as 'entrata' | 'uscita', timestamp: ordered[0].timestamp };
@@ -206,9 +220,16 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                     }
 
                     if (!latest) {
-                        // Fallback: usa lo stato locale (può essere stantio)
-                        const lastCheckIn = profileData.checkIns && profileData.checkIns.length > 0
-                            ? [...profileData.checkIns].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+                        // Fallback: usa lo stato locale ma solo per OGGI
+                        const startOfDay = new Date();
+                        startOfDay.setHours(0, 0, 0, 0);
+                        const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+                        const todaysLocal = (profileData.checkIns || []).filter(ci => {
+                            const t = new Date(ci.timestamp).getTime();
+                            return t >= startOfDay.getTime() && t < endOfDay.getTime();
+                        });
+                        const lastCheckIn = todaysLocal.length > 0
+                            ? [...todaysLocal].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
                             : null;
                         latest = lastCheckIn ? { type: lastCheckIn.type as 'entrata' | 'uscita', timestamp: lastCheckIn.timestamp } : null;
                     }
@@ -387,6 +408,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     // Nuove preferenze con default
     overtimeThresholdHours: typeof (profileData as any).overtimeThresholdHours === 'number' ? (profileData as any).overtimeThresholdHours : 6,
     nfcAutoScope: ((profileData as any).nfcAutoScope === 'all' || (profileData as any).nfcAutoScope === 'today') ? (profileData as any).nfcAutoScope : 'today',
+    nfcCooldownMinutes: typeof (profileData as any).nfcCooldownMinutes === 'number' ? (profileData as any).nfcCooldownMinutes : 30,
     };
     const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = safeProfileData;
     // Imposta filters di default se non definiti
@@ -1059,6 +1081,16 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                                             <option value="today">Considera solo oggi</option>
                                             <option value="all">Considera tutto lo storico</option>
                                         </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 220 }}>
+                                        <label>Cooldown NFC (minuti)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={safeProfileData.nfcCooldownMinutes ?? 30}
+                                            onChange={e => setNfcCooldownMinutes(Math.max(0, parseInt(e.target.value || '0', 10)))}
+                                        />
                                     </div>
                                 </div>
                                 <NfcCheckInButton
