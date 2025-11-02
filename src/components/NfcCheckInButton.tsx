@@ -144,6 +144,11 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
         const [record] = event.message.records;
         const rawPayload = record ? decodeRecordPayload(record) : null;
 
+        console.log('🏷️ Tag NFC letto:', {
+          rawPayload,
+          serialNumber: event.serialNumber
+        });
+
         if (!rawPayload) {
           abortScan(false);
           setStatus('error');
@@ -152,6 +157,8 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
         }
 
         const detectedType = extractCheckInType(rawPayload);
+        console.log('🔍 Tipo rilevato:', detectedType, 'da payload:', rawPayload);
+        
         if (!detectedType) {
           abortScan(false);
           setStatus('error');
