@@ -291,20 +291,28 @@ const App: React.FC = () => {
     const { view, ...rest } = normalized as any;
     setProfileData(rest);
     lastLocalChangeRef.current = Date.now();
+    console.log('💾 Salvataggio locale completato, sync server in 500ms...');
     try {
       if (saveTimeoutRef.current) {
         window.clearTimeout(saveTimeoutRef.current);
       }
+      // Ridotto debounce da 800ms a 500ms per salvataggio più rapido
       saveTimeoutRef.current = window.setTimeout(async () => {
         try {
+          console.log('📤 Invio profilo al server...');
           const saved = await profileApiService.saveProfile(rest);
           if (saved) {
+            console.log('✅ Profilo salvato sul server con successo');
             lastServerSnapshotRef.current = JSON.stringify(rest);
+          } else {
+            console.warn('⚠️ Salvataggio server fallito, rimarrà in locale');
           }
+        } catch (err) {
+          console.error('❌ Errore salvataggio server:', err);
         } finally {
           saveTimeoutRef.current = null;
         }
-      }, 800);
+      }, 500);
     } catch {}
   };
 
@@ -314,7 +322,7 @@ const App: React.FC = () => {
     }
 
     let cancelled = false;
-    const SYNC_INTERVAL = 15000;
+    const SYNC_INTERVAL = 10000; // Ridotto a 10 secondi per sync più frequente
 
     const pullServerProfiles = async (force = false) => {
       if (cancelled) {
@@ -322,7 +330,8 @@ const App: React.FC = () => {
       }
 
       const now = Date.now();
-      if (!force && now - lastLocalChangeRef.current < 4000) {
+      // Ridotto il tempo di blocco da 4s a 2s per permettere sync più rapide
+      if (!force && now - lastLocalChangeRef.current < 2000) {
         return;
       }
 
@@ -343,6 +352,7 @@ const App: React.FC = () => {
           return;
         }
 
+        console.log('🔄 Sincronizzazione server → client completata');
         setProfileData(normalized);
         lastServerSnapshotRef.current = previewSnapshot;
         lastLocalChangeRef.current = Date.now();
@@ -360,11 +370,18 @@ const App: React.FC = () => {
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        console.log('📱 Scheda tornata visibile, forzo sincronizzazione');
         pullServerProfiles(true);
       }
     };
 
-    document.removeEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [isAuthenticated, currentUser]);
   // --- RENDER ---
   return (

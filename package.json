@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-  "dev:api": "tsx src/server.backup/app.ts",
+    "dev:api": "tsx server.ts",
     "dev:full": "concurrently \"npm run dev:api\" \"npm run dev\"",
     "build": "tsc && vite build",
     "preview": "vite preview",

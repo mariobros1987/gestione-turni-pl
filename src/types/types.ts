@@ -168,6 +168,10 @@ export interface ProfileData {
     operativeCardOrder: string[];
     economicCardOrder: string[];
     dashboardLayout: WidgetConfig[];
+
+    // Preferenze NFC e conteggio ore
+    overtimeThresholdHours?: number; // soglia ore standard (default 6)
+    nfcAutoScope?: 'today' | 'all'; // ambito decisione auto (default 'today')
 }
 
 // --- PROPS GENERICHE PER LE CARD ---

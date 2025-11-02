@@ -79,6 +79,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const setOperativeCardOrder = createSetter('operativeCardOrder');
     const setEconomicCardOrder = createSetter('economicCardOrder');
     const setDashboardLayout = createSetter('dashboardLayout');
+    const setOvertimeThresholdHours = createSetter('overtimeThresholdHours');
+    const setNfcAutoScope = createSetter('nfcAutoScope');
 
     // --- ORA il blocco useEffect che usa setAppointments ---
     useEffect(() => {
@@ -149,30 +151,69 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         const params = new URLSearchParams(window.location.search);
         const azione = params.get('azione');
         console.log('🏷️ NFC URL rilevato:', window.location.search, 'Parametro azione:', azione);
-        
+
         if (azione === 'entrata' || azione === 'uscita') {
             console.log('✅ Azione NFC valida:', azione);
             setAzioneNfc(azione);
-        } else if (azione === 'auto') {
-            // Modalità automatica: decide in base all'ultimo check-in
-            console.log('🤖 Modalità AUTO rilevata, controllo ultimo check-in...');
-            const lastCheckIn = profileData.checkIns && profileData.checkIns.length > 0
-                ? [...profileData.checkIns].sort((a, b) => 
-                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                  )[0]
-                : null;
-            
-            if (!lastCheckIn || lastCheckIn.type === 'uscita') {
-                console.log('➡️ AUTO: Ultimo check-in è uscita o assente → registro ENTRATA');
-                setAzioneNfc('entrata');
-            } else {
-                console.log('⬅️ AUTO: Ultimo check-in è entrata → registro USCITA');
-                setAzioneNfc('uscita');
-            }
-        } else {
-            setAzioneNfc(null);
+            return;
         }
-    }, [profileData.checkIns]);
+
+        if (azione === 'auto') {
+            // Modalità automatica: decide in base all'ultimo check-in (preferisci DB del giorno corrente)
+            (async () => {
+                try {
+                    const token = localStorage.getItem('turni_pl_auth_token');
+                    let latest: { type: 'entrata' | 'uscita'; timestamp: string } | null = null;
+                    if (token) {
+                        const resp = await fetch('/api/checkin', {
+                            headers: { Authorization: `Bearer ${token}` },
+                            cache: 'no-store'
+                        });
+                        if (resp.ok) {
+                            const json = await resp.json();
+                            const list: Array<{ azione: string; timestamp: string } & any> = json?.checkIns || [];
+                            // Applica lo scope configurabile: 'today' (default) oppure 'all'
+                            let source = list;
+                            if ((profileData as any).nfcAutoScope !== 'all') {
+                                const today = new Date();
+                                const yyyy = today.getFullYear();
+                                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                const dd = String(today.getDate()).padStart(2, '0');
+                                const todayStr = `${yyyy}-${mm}-${dd}`;
+                                source = list.filter(e => (e.timestamp || '').startsWith(todayStr));
+                            }
+                            const ordered = source.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                            if (ordered[0]) {
+                                latest = { type: ordered[0].azione as 'entrata' | 'uscita', timestamp: ordered[0].timestamp };
+                            }
+                        }
+                    }
+
+                    if (!latest) {
+                        // Fallback: usa lo stato locale (può essere stantio)
+                        const lastCheckIn = profileData.checkIns && profileData.checkIns.length > 0
+                            ? [...profileData.checkIns].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+                            : null;
+                        latest = lastCheckIn ? { type: lastCheckIn.type as 'entrata' | 'uscita', timestamp: lastCheckIn.timestamp } : null;
+                    }
+
+                    if (!latest || latest.type === 'uscita') {
+                        console.log('➡️ AUTO: Ultimo check-in (oggi) è uscita o assente → registro ENTRATA');
+                        setAzioneNfc('entrata');
+                    } else {
+                        console.log('⬅️ AUTO: Ultimo check-in (oggi) è entrata → registro USCITA');
+                        setAzioneNfc('uscita');
+                    }
+                } catch (e) {
+                    console.warn('AUTO: errore durante fetch check-in, fallback a ENTRATA', e);
+                    setAzioneNfc('entrata');
+                }
+            })();
+            return;
+        }
+
+        setAzioneNfc(null);
+    }, [profileData.checkIns, (profileData as any).nfcAutoScope]);
 
     // Auto-esegui check-in se viene da NFC
     useEffect(() => {
@@ -326,6 +367,9 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         detrazioniFamiliari: 0,
         bonusIrpef: 0
     },
+    // Nuove preferenze con default
+    overtimeThresholdHours: typeof (profileData as any).overtimeThresholdHours === 'number' ? (profileData as any).overtimeThresholdHours : 6,
+    nfcAutoScope: ((profileData as any).nfcAutoScope === 'all' || (profileData as any).nfcAutoScope === 'today') ? (profileData as any).nfcAutoScope : 'today',
     };
     const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = safeProfileData;
     // Imposta filters di default se non definiti
@@ -954,7 +998,16 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             // FIX: Replaced `JSX.Element` with `React.ReactElement` to resolve TypeScript namespace error.
             // Passa filters solo alle card che lo supportano realmente come prop
             const allCards: { [key: string]: React.ReactElement } = {
-                holidays: <HolidayCard entries={holidays} setEntries={setHolidays} isCollapsed={collapsedCards.holidays} onToggleCollapse={() => toggleCollapse('holidays')} totalCurrentYear={safeProfileData.totalCurrentYearHolidays} setTotalCurrentYear={setTotalCurrentYearHolidays} totalPreviousYears={safeProfileData.totalPreviousYearsHolidays} setTotalPreviousYears={setTotalPreviousYearsHolidays} />,
+                holidays: <HolidayCard 
+                    entries={holidays} 
+                    setEntries={setHolidays} 
+                    isCollapsed={collapsedCards.holidays} 
+                    onToggleCollapse={() => toggleCollapse('holidays')} 
+                    totalCurrentYear={safeProfileData.totalCurrentYearHolidays}
+                    setTotalCurrentYear={setTotalCurrentYearHolidays}
+                    totalPreviousYears={safeProfileData.totalPreviousYearsHolidays}
+                    setTotalPreviousYears={setTotalPreviousYearsHolidays}
+                />,
                 permits: <PermitCard entries={permits} setEntries={setPermits} isCollapsed={collapsedCards.permits} onToggleCollapse={() => toggleCollapse('permits')} />,
                 overtime: <OvertimeCard entries={overtime} setEntries={setOvertime} isCollapsed={collapsedCards.overtime} onToggleCollapse={() => toggleCollapse('overtime')} />,
                 onCall: <OnCallCard entries={onCall} setEntries={setOnCall} setOnCall={setOnCall} isCollapsed={collapsedCards.onCall} onToggleCollapse={() => toggleCollapse('onCall')} />,
@@ -968,13 +1021,38 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         isCollapsed={collapsedCards.checkIn}
                         onToggleCollapse={() => toggleCollapse('checkIn')}
                         extraContent={
-                            <NfcCheckInButton
-                                lastEntryType={safeProfileData.checkIns.length > 0 ? safeProfileData.checkIns[safeProfileData.checkIns.length - 1].type : null}
-                                onRegister={(type, context) => {
-                                    handleAddCheckIn(type, context?.timestamp);
-                                }}
-                                workLocation={safeProfileData.workLocation?.name || 'Sede principale'}
-                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                                    <div className="form-group" style={{ minWidth: 220 }}>
+                                        <label>Soglia straordinario (ore)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step={0.25}
+                                            value={safeProfileData.overtimeThresholdHours ?? 6}
+                                            onChange={e => setOvertimeThresholdHours(Math.max(0, parseFloat(e.target.value) || 0))}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 220 }}>
+                                        <label>Auto NFC</label>
+                                        <select
+                                            value={(safeProfileData.nfcAutoScope ?? 'today') as 'today' | 'all'}
+                                            onChange={e => setNfcAutoScope((e.target.value === 'all' ? 'all' : 'today') as any)}
+                                        >
+                                            <option value="today">Considera solo oggi</option>
+                                            <option value="all">Considera tutto lo storico</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <NfcCheckInButton
+                                    lastEntryType={safeProfileData.checkIns.length > 0 ? safeProfileData.checkIns[safeProfileData.checkIns.length - 1].type : null}
+                                    onRegister={(type, context) => {
+                                        handleAddCheckIn(type, context?.timestamp);
+                                    }}
+                                    workLocation={safeProfileData.workLocation?.name || 'Sede principale'}
+                                    thresholdHours={safeProfileData.overtimeThresholdHours ?? 6}
+                                />
+                            </div>
                         }
                     />
                 ),

@@ -193,12 +193,12 @@ app.post('/api/checkin', async (req: Request, res: Response) => {
     // Inserimento via Prisma (affidabile in locale, evita dipendenza da chiave service role)
     console.log('[checkin] Creating with userId:', userId, 'type:', type);
     const created = await prisma.checkin.create({
-      data: {
+      data: ({
         userId: String(userId),
         azione: type,
         timestamp: new Date(timestamp || new Date().toISOString()),
         tag_content: serialNumber || null
-      }
+      } as any)
     });
 
     return res.status(200).json({ success: true, checkIn: created });

@@ -38,6 +38,7 @@ export interface NfcCheckInButtonProps {
   lastEntryType?: CheckInType | null;
   onCreateEvent?: (type: CheckInType, timestamp: Date) => void; // Callback per creare evento calendario
   workLocation?: string; // Sede di lavoro da inserire nell'evento
+  thresholdHours?: number; // soglia per straordinario/permesso
 }
 
 const SUPPORTED_BROWSER_MESSAGE =
@@ -84,7 +85,8 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
   onRegister, 
   lastEntryType,
   onCreateEvent,
-  workLocation = 'Sede principale'
+  workLocation = 'Sede principale',
+  thresholdHours = 6
 }) => {
   const [isSupported, setIsSupported] = useState(false);
   const [status, setStatus] = useState<ScanStatus>('idle');
@@ -252,17 +254,17 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
     let eventoExtra = null;
     if (type === 'uscita' && lastEntrataTimestamp) {
       oreLavorate = (timestamp.getTime() - lastEntrataTimestamp.getTime()) / (1000 * 60 * 60);
-      // Orario standard: 6 ore
-      if (oreLavorate > 6) {
-        straordinario = oreLavorate - 6;
+      // Soglia configurabile (default 6 ore)
+      if (oreLavorate > thresholdHours) {
+        straordinario = oreLavorate - thresholdHours;
         eventoExtra = {
           tipo: 'straordinario',
           value: straordinario,
           startTime: lastEntrataTimestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
           endTime: timestamp.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         };
-      } else if (oreLavorate < 6) {
-        permesso = 6 - oreLavorate;
+      } else if (oreLavorate < thresholdHours) {
+        permesso = thresholdHours - oreLavorate;
         eventoExtra = {
           tipo: 'permesso',
           value: permesso,
@@ -294,7 +296,7 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
       if (permesso > 0) msg += ` | Permesso: ${permesso.toFixed(2)}`;
     }
     setMessage(msg);
-  }, [lastEntryType, onRegister, onCreateEvent, workLocation]);
+  }, [lastEntryType, onRegister, onCreateEvent, workLocation, thresholdHours]);
 
   return (
     <div className="nfc-check-in">

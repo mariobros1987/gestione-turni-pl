@@ -1,10 +1,9 @@
 import dotenv from 'dotenv'
+dotenv.config({ override: true })
 
 // Temporary bootstrap shim: reuse the Express app preserved under src/server.backup.
 import { app } from './src/server.backup/app'
 import { prisma } from './src/lib/prisma'
-
-dotenv.config()
 
 const PORT = process.env.API_PORT || 3001
 const server = app.listen(PORT, () => {
