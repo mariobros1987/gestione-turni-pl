@@ -773,6 +773,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             const updatedCheckIns = [...(profileData.checkIns || []), newCheckIn];
             setCheckIns(updatedCheckIns);
             
+            console.log('✅ Check-in uscita registrato. CheckIns aggiornati:', updatedCheckIns.length);
+            
             // Crea evento unico "Presenza" con orario entrata/uscita
             const tEntrata = new Date(entrataRef.timestamp);
             const tUscita = customTimestamp ? customTimestamp : new Date();
@@ -792,10 +794,11 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 value: parseFloat(oreLavorate.toFixed(2)),
             };
             
+            console.log('📅 Creazione appuntamento Presenza:', newAppointment);
             setAppointments([...safeAppointments, newAppointment]);
             setPendingNfcEntry(null);
             
-            console.log('✅ Check-in uscita registrato e presenza creata:', newAppointment);
+            console.log('✅ Check-in uscita registrato e presenza creata. Appointments totali:', safeAppointments.length + 1);
         }
     };
 
