@@ -240,12 +240,21 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
     // Recupera l'ultimo check-in di tipo "entrata" per calcolare le ore
     let timestamp = new Date();
     let lastEntrataTimestamp: Date | null = null;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD di oggi
+    
     try {
       const checkIns = window.localStorage.getItem('turni_pl_profile_data');
       if (checkIns) {
         const profile = JSON.parse(checkIns);
+        // Filtra solo le entrate di oggi
         const lastEntrata = Array.isArray(profile.checkIns)
-          ? profile.checkIns.filter((c: any) => c.type === 'entrata').slice(-1)[0]
+          ? profile.checkIns
+              .filter((c: any) => {
+                if (c.type !== 'entrata') return false;
+                const checkInDate = new Date(c.timestamp).toISOString().split('T')[0];
+                return checkInDate === today;
+              })
+              .slice(-1)[0]
           : null;
         if (lastEntrata && lastEntrata.timestamp) {
           lastEntrataTimestamp = new Date(lastEntrata.timestamp);
