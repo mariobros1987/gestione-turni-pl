@@ -389,12 +389,43 @@ const App: React.FC = () => {
       {/* Lettura NFC: mostra il componente sempre, oppure solo se autenticato */}
       <div style={{ margin: '24px 0' }}>
         <NfcReader />
-        <div style={{ marginTop: 8, fontSize: 14 }}>
-          <strong>Per registrare l'entrata:</strong> scrivi sul tag NFC l'URL <br />
-          <code>https://gestione-turni-pl-main.vercel.app/?azione=entrata</code><br />
-          <strong>Per registrare l'uscita:</strong> scrivi sul tag NFC l'URL <br />
-          <code>https://gestione-turni-pl-main.vercel.app/?azione=uscita</code><br />
-          Quando il tag viene letto, il sito può mostrare il pulsante o registrare l'azione in base al parametro <code>azione</code>.
+        {/* Istruzioni per la programmazione del tag NFC */}
+        <div style={{ marginTop: 12, fontSize: 14, lineHeight: 1.5 }}>
+          <div style={{
+            padding: 12,
+            border: '1px solid #3b82f6',
+            background: '#0b1220',
+            borderRadius: 8
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>Imposta il tuo tag NFC</div>
+            <div style={{ opacity: 0.9 }}>Consigliato: usa la modalità automatica. Il sistema decide entrata/uscita in base all'ultimo evento di oggi e applica il cooldown.</div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 8,
+              flexWrap: 'wrap'
+            }}>
+              <code style={{ padding: '6px 8px', background: '#111827', borderRadius: 6 }}>
+                https://gestione-turni-pl-main.vercel.app/?azione=auto
+              </code>
+              <button
+                onClick={() => navigator.clipboard?.writeText('https://gestione-turni-pl-main.vercel.app/?azione=auto')}
+                style={{ padding: '6px 10px', borderRadius: 6 }}
+                title="Copia negli appunti"
+              >
+                Copia URL
+              </button>
+            </div>
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer' }}>Opzioni avanzate</summary>
+              <div style={{ marginTop: 6 }}>
+                • Forza entrata: <code>https://gestione-turni-pl-main.vercel.app/?azione=entrata</code><br />
+                • Forza uscita: <code>https://gestione-turni-pl-main.vercel.app/?azione=uscita</code><br />
+                Il sito interpreta il parametro <code>azione</code> e registra di conseguenza.
+              </div>
+            </details>
+          </div>
         </div>
       </div>
       {profileError && (
