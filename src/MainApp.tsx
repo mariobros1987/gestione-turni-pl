@@ -181,7 +181,11 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const azione = params.get('azione');
+        // Supporta sia ?azione=auto che ?auto
+        let azione = params.get('azione');
+        if (!azione && params.has('auto')) {
+            azione = 'auto';
+        }
         console.log('🏷️ NFC URL rilevato:', window.location.search, 'Parametro azione:', azione);
         // Controllo cooldown: se è passato meno del tempo minimo dall'ultimo check-in, ignora
         const now = Date.now();
@@ -298,6 +302,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 console.log('🧹 Rimozione parametro URL...');
                 const url = new URL(window.location.href);
                 url.searchParams.delete('azione');
+                url.searchParams.delete('auto'); // Rimuovi anche il parametro ?auto
                 window.history.replaceState({}, '', url.toString());
                 setAzioneNfc(null);
                 setNfcAutoExecuted(false); // Reset per permettere nuove scansioni
