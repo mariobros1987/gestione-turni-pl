@@ -192,12 +192,13 @@ app.post('/api/checkin', async (req: Request, res: Response) => {
 
     // Inserimento via Prisma (affidabile in locale, evita dipendenza da chiave service role)
     console.log('[checkin] Creating with userId:', userId, 'type:', type);
-    const created = await prisma.checkin.create({
+    const created = await prisma.checkIn.create({
       data: ({
         userId: String(userId),
-        azione: type,
+        type: type,
         timestamp: new Date(timestamp || new Date().toISOString()),
-        tag_content: serialNumber || null
+        serialNumber: serialNumber || null,
+        rawPayload: null
       } as any)
     });
 
@@ -217,7 +218,7 @@ app.get('/api/checkin', async (req: Request, res: Response) => {
     const userId = (decoded && (decoded as any).userId) || (decoded && (decoded as any).id);
     if (!userId) return res.status(401).json({ success: false, message: 'Token non valido (manca userId)' });
 
-    const checkIns = await prisma.checkin.findMany({
+    const checkIns = await prisma.checkIn.findMany({
       where: ({ userId: String(userId) } as any),
       orderBy: { timestamp: 'asc' }
     });
@@ -246,7 +247,7 @@ app.delete('/api/checkin', async (req: Request, res: Response) => {
     const from = new Date(`${date}T00:00:00.000Z`);
     const to = new Date(`${date}T23:59:59.999Z`);
 
-    const result = await prisma.checkin.deleteMany({
+    const result = await prisma.checkIn.deleteMany({
       where: ({ userId: String(userId), timestamp: { gte: from, lte: to } } as any)
     });
     return res.status(200).json({ success: true, deleted: result.count });
