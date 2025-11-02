@@ -83,6 +83,26 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const setOvertimeThresholdHours = createSetter('overtimeThresholdHours');
     const setNfcAutoScope = createSetter('nfcAutoScope');
 
+    // Gestione navigazione tramite hash URL (#timbratura, #calendar, etc)
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash.slice(1); // Rimuove il "#"
+            if (hash === 'timbratura' || hash === 'calendar' || hash === 'dashboard' || hash === 'report') {
+                console.log('🔗 Navigazione da URL hash:', hash);
+                setView(hash as ProfileData['view']);
+                // Pulisci l'hash dopo la navigazione
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        };
+
+        // Controlla l'hash all'avvio
+        handleHashChange();
+
+        // Ascolta i cambiamenti di hash
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
+
     // --- ORA il blocco useEffect che usa setAppointments ---
     const syncCheckInsRef = useRef<() => Promise<void>>();
     
