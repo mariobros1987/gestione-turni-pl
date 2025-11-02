@@ -2,7 +2,11 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
+// Singleton Prisma per evitare connessioni multiple
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -20,6 +24,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const userId = (decoded as any).userId;
+
+  // GET: Recupera check-in dell'utente
+  if (req.method === 'GET') {
+    try {
+      const checkIns = await prisma.checkIn.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' }
+      });
+      return res.status(200).json({ success: true, checkIns });
+    } catch (error) {
+      console.error('❌ Errore recupero check-in:', error);
+      return res.status(500).json({ success: false, message: 'Errore interno' });
+    }
+  }
 
   // POST: Crea check-in
   if (req.method === 'POST') {

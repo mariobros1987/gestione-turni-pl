@@ -2,7 +2,11 @@ import { VercelRequest, VercelResponse } from '@vercel/node'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 
-const prisma = new PrismaClient()
+// Singleton Prisma per evitare connessioni multiple
+const globalForPrisma = global as unknown as { prisma: PrismaClient }
+const prisma = globalForPrisma.prisma || new PrismaClient()
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024'
 const DEFAULT_PROFILE_NAME = 'primary'
 
