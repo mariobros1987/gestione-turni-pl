@@ -146,11 +146,27 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     // Rileva parametro azione NFC dall'URL
     const [azioneNfc, setAzioneNfc] = useState<string | null>(null);
     const [nfcAutoExecuted, setNfcAutoExecuted] = useState(false);
-    
+    const [lastNfcTimestamp, setLastNfcTimestamp] = useState<number>(0);
+    const [nfcCooldownMessage, setNfcCooldownMessage] = useState<string | null>(null);
+    const NFC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minuti di protezione anti-doppia lettura
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const azione = params.get('azione');
         console.log('🏷️ NFC URL rilevato:', window.location.search, 'Parametro azione:', azione);
+        // Controllo cooldown: se è passato meno del tempo minimo dall'ultimo check-in, ignora
+        const now = Date.now();
+        const timeSinceLastNfc = now - lastNfcTimestamp;
+        if (lastNfcTimestamp > 0 && timeSinceLastNfc < NFC_COOLDOWN_MS) {
+            const minutesRemaining = Math.ceil((NFC_COOLDOWN_MS - timeSinceLastNfc) / 60000);
+            console.warn(`⏳ NFC in cooldown: attendi altri ${minutesRemaining} minuti prima del prossimo check-in`);
+            setNfcCooldownMessage(`Attendi altri ${minutesRemaining} minuti prima del prossimo check-in`);
+            setTimeout(() => setNfcCooldownMessage(null), 5000);
+            setAzioneNfc(null);
+    setNfcCooldownMessage(null);
+            return;
+        }
+
 
         if (azione === 'entrata' || azione === 'uscita') {
             console.log('✅ Azione NFC valida:', azione);
@@ -225,6 +241,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             // Esegui il check-in
             handleAddCheckIn(azioneNfc as 'entrata' | 'uscita');
             setNfcAutoExecuted(true);
+            setLastNfcTimestamp(Date.now()); // Salva timestamp per cooldown
             
             console.log(`✅ Check-in ${azioneNfc} eseguito!`);
             
@@ -1122,6 +1139,26 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     return (
         <AppContext.Provider value={{ handleSaveEvent }}>
         <>
+            {/* Messaggio di cooldown NFC */}
+            {nfcCooldownMessage && (
+                <div style={{ 
+                    background: '#fff3cd', 
+                    border: '2px solid #ffc107', 
+                    padding: '20px', 
+                    borderRadius: '12px', 
+                    margin: '16px 0',
+                    textAlign: 'center',
+                    animation: 'fadeIn 0.3s ease-in'
+                }}>
+                    <h2 style={{ margin: '0 0 10px 0', color: '#856404' }}>
+                        ⏳ Check-in già registrato
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#856404' }}>
+                        {nfcCooldownMessage}
+                    </p>
+                </div>
+            )}
+
             {/* Se l'URL contiene ?azione=entrata o ?azione=uscita mostra i pulsanti NFC */}
             {azioneNfc && (
                 <div style={{ 
