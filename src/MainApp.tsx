@@ -600,17 +600,23 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                     try {
                         const token = localStorage.getItem('turni_pl_auth_token');
                         if (token) {
-                            await fetch('/api/checkin', {
+                            const resp = await fetch(`/api/checkin?date=${presenza.date}`, {
                                 method: 'DELETE',
                                 headers: {
-                                    'Content-Type': 'application/json',
                                     'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({ date: presenza.date })
+                                }
                             });
+                            const result = await resp.json();
+                            console.log(`✅ Check-in cancellati per ${presenza.date}:`, result.deleted);
+                            
+                            // Forza refresh immediato per aggiornare il calendario
+                            if (syncCheckInsRef.current) {
+                                setTimeout(() => syncCheckInsRef.current?.(), 500);
+                            }
                         }
                     } catch (e) {
-                        console.warn('Errore cancellazione check-in server-side:', e);
+                        console.error('❌ Errore cancellazione check-in server-side:', e);
+                        alert('Errore durante la cancellazione dei check-in dal database');
                     }
                 })();
             }
