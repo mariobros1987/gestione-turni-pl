@@ -162,14 +162,14 @@ export const NfcCheckInButton: React.FC<NfcCheckInButtonProps> = ({
         if (!detectedType) {
           abortScan(false);
           setStatus('error');
-          setMessage('Contenuto tag non riconosciuto. Usa "entrata" o "uscita" nel payload.');
+          setMessage(`Tag non riconosciuto. Contenuto: "${rawPayload}". Usa "entrata" o "uscita".`);
           return;
         }
 
         if (lastEntryType && lastEntryType === detectedType) {
           abortScan(false);
           setStatus('error');
-          setMessage('Hai già registrato una ' + detectedType + ' come ultimo evento.');
+          setMessage(`Hai già registrato una ${detectedType} come ultimo evento. Ultimo: ${lastEntryType}, Letto: ${detectedType}`);
           return;
         }
 
