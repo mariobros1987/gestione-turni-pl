@@ -6,10 +6,6 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Metodo non supportato' });
-  }
-
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
@@ -24,24 +20,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const userId = (decoded as any).userId;
-  const { type, serialNumber, rawPayload, timestamp } = req.body;
-  if (!type || !timestamp) {
-    return res.status(400).json({ success: false, message: 'Type e timestamp sono obbligatori' });
+
+  // POST: Crea check-in
+  if (req.method === 'POST') {
+    const { type, serialNumber, rawPayload, timestamp } = req.body;
+    if (!type || !timestamp) {
+      return res.status(400).json({ success: false, message: 'Type e timestamp sono obbligatori' });
+    }
+
+    try {
+      const checkIn = await prisma.checkIn.create({
+        data: {
+          userId,
+          type,
+          serialNumber,
+          rawPayload,
+          timestamp: new Date(timestamp),
+        },
+      });
+      return res.status(200).json({ success: true, checkIn });
+    } catch (error) {
+      console.error('❌ Errore salvataggio check-in NFC:', error);
+      return res.status(500).json({ success: false, message: 'Errore interno' });
+    }
   }
 
-  try {
-    const checkIn = await prisma.checkIn.create({
-      data: {
-        userId,
-        type,
-        serialNumber,
-        rawPayload,
-        timestamp: new Date(timestamp),
-      },
-    });
-    return res.status(200).json({ success: true, checkIn });
-  } catch (error) {
-    console.error('❌ Errore salvataggio check-in NFC:', error);
-    return res.status(500).json({ success: false, message: 'Errore interno' });
+  // DELETE: Cancella check-in di una specifica data
+  if (req.method === 'DELETE') {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ success: false, message: 'Parametro date mancante (YYYY-MM-DD)' });
+    }
+
+    try {
+      const from = new Date(`${date}T00:00:00.000Z`);
+      const to = new Date(`${date}T23:59:59.999Z`);
+
+      const result = await prisma.checkIn.deleteMany({
+        where: {
+          userId,
+          timestamp: {
+            gte: from,
+            lte: to
+          }
+        }
+      });
+
+      return res.status(200).json({ success: true, deleted: result.count });
+    } catch (error) {
+      console.error('❌ Errore cancellazione check-in:', error);
+      return res.status(500).json({ success: false, message: 'Errore interno' });
+    }
   }
+
+  return res.status(405).json({ success: false, message: 'Metodo non supportato' });
 }

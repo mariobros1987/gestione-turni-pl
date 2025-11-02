@@ -830,8 +830,37 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         console.log(`✅ Evento calendario creato: ${title} alle ${timeStr}`);
     };
 
-    const handleDeleteCheckIn = (id: string) => {
+    const handleDeleteCheckIn = async (id: string) => {
+        // Trova il check-in da eliminare per ottenere la data
+        const checkInToDelete = profileData.checkIns.find(c => c.id === id);
+        
+        // Rimuovi dallo stato locale
         setCheckIns(profileData.checkIns.filter(c => c.id !== id));
+        
+        // Cancella dal database se autenticato
+        if (checkInToDelete) {
+            try {
+                const token = localStorage.getItem('turni_pl_auth_token');
+                if (token) {
+                    const checkInDate = new Date(checkInToDelete.timestamp).toISOString().split('T')[0];
+                    const response = await fetch(`/api/checkin?date=${checkInDate}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        console.error('❌ Errore cancellazione check-in dal database:', await response.text());
+                    } else {
+                        console.log('✅ Check-in cancellato dal database');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Errore chiamata API cancellazione check-in:', error);
+            }
+        }
     };
 
     const handleOpenModalWithAiData = (aiData: Partial<AllEntryTypes> & { type: AllEntryTypes['type'] }) => {
