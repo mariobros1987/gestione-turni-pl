@@ -108,8 +108,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 for (const entry of data) {
                     const date = entry.timestamp.split('T')[0];
                     if (!byDay[date]) byDay[date] = {};
-                    if (entry.azione === 'entrata') byDay[date].entrata = entry;
-                    if (entry.azione === 'uscita') byDay[date].uscita = entry;
+                    if (entry.type === 'entrata') byDay[date].entrata = entry;
+                    if (entry.type === 'uscita') byDay[date].uscita = entry;
                 }
                 const newAppointments: AppointmentEntry[] = [];
                 for (const date in byDay) {
