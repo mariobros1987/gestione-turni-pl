@@ -304,6 +304,16 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             setNfcSuccessMessage(message);
             setTimeout(() => setNfcSuccessMessage(null), 5000);
             
+            // Forza sincronizzazione immediata per aggiornare il calendario
+            setTimeout(() => {
+                if (syncCheckInsRef.current) {
+                    console.log('🔄 Forzatura sincronizzazione check-in dopo registrazione NFC...');
+                    syncCheckInsRef.current().then(() => {
+                        console.log('✅ Sincronizzazione completata, calendario aggiornato');
+                    });
+                }
+            }, 2000); // Attendi 2 secondi per dare tempo al server di salvare
+            
             // Prova anche notifica desktop se permesso
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                 try {
@@ -727,6 +737,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
 
     const handleAddCheckIn = async (type: 'entrata' | 'uscita', customTimestamp?: Date) => {
         const timestamp = customTimestamp ? customTimestamp.toISOString() : new Date().toISOString();
+        console.log(`🕐 handleAddCheckIn chiamata - Tipo: ${type}, Timestamp: ${timestamp}`);
+        
         // Normalizzazione difensiva per appointments
         const safeAppointments = Array.isArray(profileData.appointments) ? profileData.appointments : [];
         
@@ -737,6 +749,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 timestamp,
                 type: 'entrata'
             };
+            
+            console.log('📤 Invio check-in entrata al server:', newCheckIn);
             
             // Salva in Supabase
             try {
@@ -755,8 +769,11 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         })
                     });
                     
+                    const responseText = await response.text();
+                    console.log('📥 Risposta server check-in entrata:', response.status, responseText);
+                    
                     if (!response.ok) {
-                        console.error('❌ Errore salvataggio check-in entrata:', await response.text());
+                        console.error('❌ Errore salvataggio check-in entrata:', responseText);
                     } else {
                         console.log('✅ Check-in entrata salvato in Supabase');
                     }
@@ -772,7 +789,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             // Salva anche come stato temporaneo per abbinamento con uscita
             setPendingNfcEntry({ id: newCheckIn.id, timestamp, type });
             
-            console.log('✅ Check-in entrata registrato:', newCheckIn);
+            console.log('✅ Check-in entrata registrato localmente:', newCheckIn);
             
         } else if (type === 'uscita') {
             let entrataRef = pendingNfcEntry && pendingNfcEntry.type === 'entrata' ? pendingNfcEntry : null;
