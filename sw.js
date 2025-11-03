@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestione-turni-pl-cache-v3';
+const CACHE_NAME = 'gestione-turni-pl-cache-v4';
 const URLS_TO_CACHE = [
   '/',
   'index.html',
@@ -29,6 +29,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  const url = new URL(event.request.url);
+  
+  // NON intercettare:
+  // 1. Richieste API (backend)
+  // 2. Richieste con parametri NFC (?azione, ?auto)
+  // 3. Richieste verso domini esterni
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.searchParams.has('azione') ||
+    url.searchParams.has('auto') ||
+    url.origin !== location.origin
+  ) {
+    // Passa direttamente alla rete senza cache
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -40,8 +56,11 @@ self.addEventListener('fetch', event => {
         // Non in cache, esegui il fetch dalla rete
         return fetch(event.request).catch(() => {
           // Se la richiesta di rete fallisce, restituisci la pagina di fallback offline
-          console.error('Network request failed for:', event.request.url);
-          return caches.match('offline.html');
+          // ma solo per navigazioni HTML, non per asset
+          if (event.request.headers.get('accept')?.includes('text/html')) {
+            console.error('Network request failed for:', event.request.url);
+            return caches.match('offline.html');
+          }
         });
       }
     )
