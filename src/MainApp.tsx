@@ -125,15 +125,27 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 }
                 const json = await resp.json();
                 const data = json?.checkIns || [];
-                console.log('DEBUG CHECKIN QUERY via API, Risultato:', data);
+                console.log('🔄 Sincronizzazione check-in, trovati:', data.length, 'records');
+                
                 // Raggruppa per giorno e crea appuntamenti "Presenza"
                 const byDay: Record<string, { entrata?: any; uscita?: any }> = {};
                 for (const entry of data) {
                     const date = entry.timestamp.split('T')[0];
                     if (!byDay[date]) byDay[date] = {};
-                    if (entry.type === 'entrata') byDay[date].entrata = entry;
-                    if (entry.type === 'uscita') byDay[date].uscita = entry;
+                    if (entry.type === 'entrata') {
+                        // Prendi l'ultima entrata del giorno
+                        if (!byDay[date].entrata || new Date(entry.timestamp) > new Date(byDay[date].entrata.timestamp)) {
+                            byDay[date].entrata = entry;
+                        }
+                    }
+                    if (entry.type === 'uscita') {
+                        // Prendi l'ultima uscita del giorno
+                        if (!byDay[date].uscita || new Date(entry.timestamp) > new Date(byDay[date].uscita.timestamp)) {
+                            byDay[date].uscita = entry;
+                        }
+                    }
                 }
+                
                 const newAppointments: AppointmentEntry[] = [];
                 for (const date in byDay) {
                     const entrata = byDay[date].entrata;
@@ -143,7 +155,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         const endTime = new Date(uscita.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                         const oreLavorate = (new Date(uscita.timestamp).getTime() - new Date(entrata.timestamp).getTime()) / (1000 * 60 * 60);
                         newAppointments.push({
-                            id: `${entrata.id}-${uscita.id}-presenza`,
+                            id: `presenza-${date}`,
                             date,
                             type: 'appuntamento',
                             title: 'Presenza',
@@ -154,12 +166,24 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         });
                     }
                 }
-                // Aggiorna solo se ci sono cambiamenti
-                if (JSON.stringify(newAppointments) !== JSON.stringify(profileData.appointments.filter(a => a.title === 'Presenza'))) {
-                    const otherAppointments = profileData.appointments.filter(a => a.title !== 'Presenza');
-                    setAppointments([...otherAppointments, ...newAppointments]);
+                
+                console.log('📅 Presenze generate dal sync:', newAppointments.length);
+                
+                // SEMPRE aggiorna: rimuovi le vecchie presenze e aggiungi le nuove
+                const otherAppointments = profileData.appointments.filter(a => a.title !== 'Presenza');
+                const updatedAppointments = [...otherAppointments, ...newAppointments];
+                
+                // Aggiorna solo se diverso
+                if (JSON.stringify(updatedAppointments.sort((a,b) => a.id.localeCompare(b.id))) !== 
+                    JSON.stringify(profileData.appointments.sort((a,b) => a.id.localeCompare(b.id)))) {
+                    console.log('✅ Aggiornamento appointments con nuove presenze');
+                    setAppointments(updatedAppointments);
+                } else {
+                    console.log('ℹ️ Nessun cambiamento negli appointments');
                 }
-            } catch {}
+            } catch (e) {
+                console.error('❌ Errore sync check-in:', e);
+            }
         }
         
         // Esponi la funzione tramite ref
@@ -168,7 +192,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         fetchCheckInsAndSyncAppointments();
         const interval = setInterval(() => {
             if (polling) fetchCheckInsAndSyncAppointments();
-        }, 15000);
+        }, 5000); // Ridotto a 5 secondi per sync più rapido
         return () => { polling = false; clearInterval(interval); };
     }, [profileData.appointments, setAppointments]);
     // Rileva parametro azione NFC dall'URL
