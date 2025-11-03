@@ -176,6 +176,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const [nfcAutoExecuted, setNfcAutoExecuted] = useState(false);
     const [lastNfcTimestamp, setLastNfcTimestamp] = useState<number>(0);
     const [nfcCooldownMessage, setNfcCooldownMessage] = useState<string | null>(null);
+    const [nfcSuccessMessage, setNfcSuccessMessage] = useState<string | null>(null);
     // Cooldown configurabile: nfcCooldownMinutes (default 30)
     const NFC_COOLDOWN_MS = Math.max(0, Number((profileData as any).nfcCooldownMinutes ?? 30)) * 60 * 1000;
 
@@ -296,6 +297,24 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             setLastNfcTimestamp(Date.now()); // Salva timestamp per cooldown
             
             console.log(`✅ Check-in ${azioneNfc} eseguito!`);
+            
+            // Mostra notifica visiva
+            const timestamp = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+            const message = `✅ ${azioneNfc.toUpperCase()} registrata alle ${timestamp}`;
+            setNfcSuccessMessage(message);
+            setTimeout(() => setNfcSuccessMessage(null), 5000);
+            
+            // Prova anche notifica desktop se permesso
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('Presenza registrata', {
+                        body: message,
+                        icon: '/icon-192.png'
+                    });
+                } catch (e) {
+                    console.warn('Notifica desktop fallita:', e);
+                }
+            }
             
             // Mostra notifica e rimuovi parametro URL dopo 3 secondi
             setTimeout(() => {
@@ -1250,6 +1269,26 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     return (
         <AppContext.Provider value={{ handleSaveEvent }}>
         <>
+            {/* Messaggio di successo NFC */}
+            {nfcSuccessMessage && (
+                <div style={{ 
+                    background: '#d4edda', 
+                    border: '2px solid #28a745', 
+                    padding: '20px', 
+                    borderRadius: '12px', 
+                    margin: '16px 0',
+                    textAlign: 'center',
+                    animation: 'fadeIn 0.3s ease-in'
+                }}>
+                    <h2 style={{ margin: '0 0 10px 0', color: '#155724' }}>
+                        {nfcSuccessMessage}
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#155724' }}>
+                        La presenza è stata registrata con successo
+                    </p>
+                </div>
+            )}
+            
             {/* Messaggio di cooldown NFC */}
             {nfcCooldownMessage && (
                 <div style={{ 
