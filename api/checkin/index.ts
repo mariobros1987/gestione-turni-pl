@@ -28,8 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET: Recupera check-in dell'utente
   if (req.method === 'GET') {
     try {
-      const checkIns = await prisma.checkIn.findMany({
-        where: { userId },
+      const checkIns = await prisma.checkin.findMany({
+        where: { user_id: userId },
         orderBy: { timestamp: 'desc' }
       });
       return res.status(200).json({ success: true, checkIns });
@@ -47,14 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const checkIn = await prisma.checkIn.create({
+      const checkIn = await prisma.checkin.create({
         data: {
-          userId,
+          user_id: userId,
           type,
           serialNumber,
           rawPayload,
           timestamp: new Date(timestamp),
-        },
+        } as any,
       });
       return res.status(200).json({ success: true, checkIn });
     } catch (error) {
@@ -74,9 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const from = new Date(`${date}T00:00:00.000Z`);
       const to = new Date(`${date}T23:59:59.999Z`);
 
-      const result = await prisma.checkIn.deleteMany({
+      const result = await prisma.checkin.deleteMany({
         where: {
-          userId,
+          user_id: userId,
           timestamp: {
             gte: from,
             lte: to
