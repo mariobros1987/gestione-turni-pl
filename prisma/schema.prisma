@@ -117,13 +117,11 @@ model Event {
   @@map("events")
 }
 
-model CheckIn {
+model checkin {
   id            Int      @id @default(autoincrement())
   user_id       String
   type          String
   timestamp     DateTime @db.Timestamptz(6)
   serialNumber  String?
   rawPayload    String?
-  
-  @@map("checkin")
 }
