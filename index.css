@@ -107,10 +107,12 @@
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -125,15 +127,25 @@ header {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    transition: all 0.3s ease-in-out;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: sticky;
     top: 1rem;
     z-index: 100;
-    border: 1px solid var(--border-color);
-    background-color: var(--card-background-color);
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
     padding: 1.25rem 1.5rem;
-    box-shadow: var(--shadow);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    header {
+        background: linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(30, 30, 30, 0.9) 100%);
+        border-color: rgba(255, 255, 255, 0.05);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
 }
 
 main {
@@ -172,15 +184,24 @@ main {
 .view-switcher button {
     background-color: var(--hover-background);
     color: var(--text-color);
-    border: 1px solid var(--border-color);
-    padding: 0.5rem 1rem;
+    border: 2px solid var(--border-color);
+    padding: 0.625rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.view-switcher button:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 90, 156, 0.1);
 }
 
 .view-switcher button.active {
-    background-color: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: var(--light-text-color);
     font-weight: 700;
-    border-color: var(--primary-color);
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(0, 90, 156, 0.3);
 }
 
 .btn-logout {
@@ -223,18 +244,35 @@ main {
 }
 
 .card {
-    background-color: var(--card-background-color);
-    border-radius: 12px; /* Increased border-radius */
-    box-shadow: var(--shadow);
-    padding: 2rem; /* Increased padding */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 2rem;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s ease-in-out; /* Slower transition */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .card {
+        background: linear-gradient(135deg, rgba(30, 30, 30, 0.95) 0%, rgba(30, 30, 30, 0.9) 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
 }
 
 .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    .card:hover {
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
 }
 
 .card.draggable {
@@ -334,13 +372,13 @@ main {
 .form-group select,
 .form-group textarea {
     padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px; /* Increased border-radius */
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
     font-size: 1rem;
     width: 100%;
     background-color: var(--input-background);
     color: var(--text-color);
-    transition: all 0.2s ease-in-out;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .form-group textarea {
@@ -365,7 +403,8 @@ main {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--secondary-color);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Improved focus */
+    box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.15);
+    transform: translateY(-1px);
 }
 
 .time-range-group {
@@ -405,21 +444,41 @@ main {
 button {
     cursor: pointer;
     border: none;
-    border-radius: 6px; /* Increased border-radius */
+    border-radius: 10px;
     padding: 0.75rem 1rem;
     font-size: 1rem;
     font-weight: 500;
-    transition: all 0.2s ease-in-out; /* Universal transition */
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+button:hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 button:hover {
-    transform: translateY(-2px); /* Lift effect on hover */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 button:active {
-    transform: translateY(0px); /* Return to original position on click */
-    box-shadow: none;
+    transform: translateY(0px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-add {
@@ -455,11 +514,24 @@ button:active {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.875rem;
     border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.2s ease-in-out;
-    border-radius: 4px; /* Added border-radius */
-    margin-bottom: 0.25rem; /* Added spacing */
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+    .entry-list li {
+        background-color: rgba(42, 42, 42, 0.5);
+    }
+}
+
+.entry-list li:hover {
+    background-color: var(--hover-background);
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .entry-list li:last-child {
@@ -813,16 +885,20 @@ button:active {
 
 .calendar-day {
     border: 1px solid var(--border-color);
+    border-radius: 12px;
     min-height: 120px;
     display: flex;
     flex-direction: column;
-    padding: 5px;
-    transition: background-color 0.2s;
+    padding: 8px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    background-color: var(--card-background-color);
 }
 
 .calendar-day:hover {
     background-color: var(--hover-background);
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-day.empty {
@@ -836,14 +912,27 @@ button:active {
 }
 
 .calendar-day.today .day-number {
-    background-color: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: var(--light-text-color);
     border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
     text-align: center;
     font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 90, 156, 0.4);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(0, 90, 156, 0.4);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 90, 156, 0.6);
+    }
 }
 
 .calendar-day.is-holiday {
@@ -1179,13 +1268,36 @@ button:active {
 
 /* Day Popover for Calendar */
 .day-popover {
-    background-color: var(--card-background-color);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     width: 90%;
     max-width: 600px;
     position: relative;
+    animation: popoverSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+    .day-popover {
+        background: linear-gradient(135deg, rgba(30, 30, 30, 0.98) 0%, rgba(30, 30, 30, 0.95) 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+@keyframes popoverSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .day-popover h3 {
@@ -1203,16 +1315,26 @@ button:active {
 .popover-event-list .event-item {
     display: flex;
     align-items: center;
-    padding: 0.75rem;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
     cursor: pointer;
-    transition: background-color 0.2s ease-in-out;
-    border-left: 5px solid transparent;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: 4px solid transparent;
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(5px);
+}
+
+@media (prefers-color-scheme: dark) {
+    .popover-event-list .event-item {
+        background-color: rgba(42, 42, 42, 0.6);
+    }
 }
 
 .popover-event-list .event-item:hover {
     background-color: var(--background-color);
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .event-item.ferie { border-color: var(--color-ferie); }
