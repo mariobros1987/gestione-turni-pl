@@ -77,7 +77,7 @@ const NfcReader: React.FC = () => {
           setReading(false);
           // Se l'URL letto contiene /nfc, registra alternando entrata/uscita
           if (
-            content.includes('gestione-turni-pl-main.vercel.app') &&
+            content.includes('gestione-turni-pl.vercel.app') &&
             (content.includes('azione=entrata') || content.includes('azione=uscita'))
           ) {
             registerCheckIn(content);

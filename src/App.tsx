@@ -407,10 +407,10 @@ const App: React.FC = () => {
               flexWrap: 'wrap'
             }}>
               <code style={{ padding: '6px 8px', background: '#111827', borderRadius: 6 }}>
-                https://gestione-turni-pl-main.vercel.app/?azione=auto
+                https://gestione-turni-pl.vercel.app/?azione=auto
               </code>
               <button
-                onClick={() => navigator.clipboard?.writeText('https://gestione-turni-pl-main.vercel.app/?azione=auto')}
+                onClick={() => navigator.clipboard?.writeText('https://gestione-turni-pl.vercel.app/?azione=auto')}
                 style={{ padding: '6px 10px', borderRadius: 6 }}
                 title="Copia negli appunti"
               >
@@ -420,8 +420,8 @@ const App: React.FC = () => {
             <details style={{ marginTop: 8 }}>
               <summary style={{ cursor: 'pointer' }}>Opzioni avanzate</summary>
               <div style={{ marginTop: 6 }}>
-                • Forza entrata: <code>https://gestione-turni-pl-main.vercel.app/?azione=entrata</code><br />
-                • Forza uscita: <code>https://gestione-turni-pl-main.vercel.app/?azione=uscita</code><br />
+                • Forza entrata: <code>https://gestione-turni-pl.vercel.app/?azione=entrata</code><br />
+                • Forza uscita: <code>https://gestione-turni-pl.vercel.app/?azione=uscita</code><br />
                 Il sito interpreta il parametro <code>azione</code> e registra di conseguenza.
               </div>
             </details>
