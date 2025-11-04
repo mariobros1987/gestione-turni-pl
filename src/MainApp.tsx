@@ -233,61 +233,35 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         }
 
         if (azione === 'auto') {
-            // Modalità automatica: decide in base all'ultimo check-in (preferisci DB del giorno corrente)
+            // Modalità automatica: usa SEMPRE lo stato locale per alternanza immediata
             (async () => {
                 try {
-                    const token = localStorage.getItem('turni_pl_auth_token');
+                    console.log('🔍 AUTO: Determinazione azione basata su stato locale');
+                    
+                    // Intervallo del giorno locale [start, end)
+                    const startOfDay = new Date();
+                    startOfDay.setHours(0, 0, 0, 0);
+                    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+                    
+                    // Filtra i check-in di oggi
+                    const todaysLocal = (profileData.checkIns || []).filter(ci => {
+                        const t = new Date(ci.timestamp).getTime();
+                        return t >= startOfDay.getTime() && t < endOfDay.getTime();
+                    });
+                    
+                    console.log(`📊 Check-in di oggi trovati: ${todaysLocal.length}`, todaysLocal);
+                    
+                    // Trova l'ultimo check-in di oggi
+                    const lastCheckIn = todaysLocal.length > 0
+                        ? [...todaysLocal].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
+                        : null;
+                    
                     let latest: { type: 'entrata' | 'uscita'; timestamp: string } | null = null;
-                    if (token) {
-                        const resp = await fetch('/api/checkin', {
-                            headers: { Authorization: `Bearer ${token}` },
-                            cache: 'no-store'
-                        });
-                        if (resp.ok) {
-                            const json = await resp.json();
-                            const list: Array<{ azione: string; timestamp: string } & any> = json?.checkIns || [];
-
-                            // Intervallo del giorno locale [start, end)
-                            const startOfDay = new Date();
-                            startOfDay.setHours(0, 0, 0, 0);
-                            const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-
-                            const isToday = (iso: string) => {
-                                const t = new Date(iso).getTime();
-                                return t >= startOfDay.getTime() && t < endOfDay.getTime();
-                            };
-
-                            const todays = list.filter(e => isToday(e.timestamp || ''));
-
-                            let source: typeof list = [];
-                            if ((profileData as any).nfcAutoScope === 'all') {
-                                // Se oggi non c'è nulla, forziamo ENTRATA (source vuoto)
-                                source = todays.length > 0 ? todays : [];
-                            } else {
-                                // Solo oggi
-                                source = todays;
-                            }
-
-                            const ordered = source.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-                            if (ordered[0]) {
-                                latest = { type: ordered[0].azione as 'entrata' | 'uscita', timestamp: ordered[0].timestamp };
-                            }
-                        }
-                    }
-
-                    if (!latest) {
-                        // Fallback: usa lo stato locale ma solo per OGGI
-                        const startOfDay = new Date();
-                        startOfDay.setHours(0, 0, 0, 0);
-                        const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-                        const todaysLocal = (profileData.checkIns || []).filter(ci => {
-                            const t = new Date(ci.timestamp).getTime();
-                            return t >= startOfDay.getTime() && t < endOfDay.getTime();
-                        });
-                        const lastCheckIn = todaysLocal.length > 0
-                            ? [...todaysLocal].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
-                            : null;
-                        latest = lastCheckIn ? { type: lastCheckIn.type as 'entrata' | 'uscita', timestamp: lastCheckIn.timestamp } : null;
+                    if (lastCheckIn) {
+                        latest = { type: lastCheckIn.type as 'entrata' | 'uscita', timestamp: lastCheckIn.timestamp };
+                        console.log(`📌 Ultimo check-in trovato: ${latest.type} alle ${new Date(latest.timestamp).toLocaleTimeString('it-IT')}`);
+                    } else {
+                        console.log('📭 Nessun check-in trovato oggi');
                     }
 
                     // Logica di alternanza: 
@@ -301,7 +275,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         setAzioneNfc('uscita');
                     }
                 } catch (e) {
-                    console.warn('AUTO: errore durante fetch check-in, fallback a ENTRATA', e);
+                    console.warn('AUTO: errore durante determinazione azione, fallback a ENTRATA', e);
                     setAzioneNfc('entrata');
                 }
             })();
