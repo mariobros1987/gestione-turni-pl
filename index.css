@@ -975,21 +975,71 @@ button:active {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .calendar-header h2 {
     color: var(--primary-color);
     font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
 }
 
 .calendar-header button {
-    background: var(--secondary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: var(--light-text-color);
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     font-size: 1.5rem;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 90, 156, 0.25);
+}
+
+.calendar-header button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 90, 156, 0.4);
+}
+
+.calendar-header button.today-btn {
+    border-radius: 12px;
+    width: auto;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.calendar-month-year {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.calendar-month {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1.2;
+}
+
+.calendar-year {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-color-light);
+    letter-spacing: 1px;
 }
 
 .calendar-grid {
@@ -1007,6 +1057,18 @@ button:active {
 .calendar-weekday {
     font-weight: 700;
     color: var(--primary-color);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 0.5rem;
+    background: linear-gradient(135deg, rgba(0, 90, 156, 0.05) 0%, rgba(0, 123, 255, 0.05) 100%);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.calendar-weekday.weekend {
+    color: var(--color-reperibilita);
+    background: linear-gradient(135deg, rgba(103, 58, 183, 0.08) 0%, rgba(103, 58, 183, 0.12) 100%);
 }
 
 .calendar-day {
@@ -1019,6 +1081,31 @@ button:active {
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     background-color: var(--card-background-color);
+}
+
+/* Weekend styling */
+.calendar-day.weekend {
+    background: linear-gradient(135deg, rgba(103, 58, 183, 0.03) 0%, rgba(103, 58, 183, 0.08) 100%);
+    border-color: rgba(103, 58, 183, 0.15);
+}
+
+.calendar-day.weekend:hover {
+    background: linear-gradient(135deg, rgba(103, 58, 183, 0.08) 0%, rgba(103, 58, 183, 0.12) 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+    .calendar-day.weekend {
+        background: linear-gradient(135deg, rgba(103, 58, 183, 0.08) 0%, rgba(103, 58, 183, 0.15) 100%);
+    }
+}
+
+/* Past days fade */
+.calendar-day.past:not(.today) {
+    opacity: 0.6;
+}
+
+.calendar-day.past:not(.today):hover {
+    opacity: 0.75;
 }
 
 .calendar-day:hover {
@@ -1093,6 +1180,49 @@ button:active {
     font-size: 0.9rem;
     margin-bottom: 5px;
     align-self: flex-start;
+}
+
+/* Event indicators - dots for quick view */
+.day-events-indicator {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    align-self: flex-start;
+}
+
+.event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease;
+}
+
+.event-dot:hover {
+    transform: scale(1.5);
+}
+
+.event-dot.ferie { background-color: var(--color-ferie); }
+.event-dot.permessi { background-color: var(--color-permessi); }
+.event-dot.straordinario { background-color: var(--color-straordinario); }
+.event-dot.reperibilita { background-color: var(--color-reperibilita); }
+.event-dot.progetto { background-color: var(--color-progetto); }
+.event-dot.appuntamento { background-color: var(--color-appuntamento); }
+
+/* Event count badge */
+.events-count-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: auto;
+    align-self: flex-start;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    animation: scaleIn 0.3s ease-out;
 }
 
 .shift-info, .shift-override-info {
