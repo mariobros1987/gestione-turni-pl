@@ -1276,6 +1276,8 @@ button:active {
     animation: fadeIn 0.2s ease-out;
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
+    overflow-y: auto;
+    padding: 2rem 0;
 }
 
 .modal-content {
@@ -1286,9 +1288,10 @@ button:active {
     width: 90%;
     max-width: 500px;
     position: relative;
-    max-height: 90vh;
+    max-height: 85vh;
     overflow-y: auto;
     animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: auto;
 }
 
 .modal-close-btn {
@@ -1425,8 +1428,11 @@ button:active {
     border: 1px solid rgba(255, 255, 255, 0.3);
     width: 90%;
     max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
     position: relative;
     animation: popoverSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: auto;
 }
 
 @media (prefers-color-scheme: dark) {
