@@ -7,9 +7,26 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
+// Funzione helper per assicurare la connessione
+async function ensurePrismaConnection() {
+  try {
+    await prisma.$connect();
+  } catch (error) {
+    console.error('❌ Errore connessione Prisma:', error);
+    throw error;
+  }
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Assicura connessione Prisma prima di qualsiasi query
+  try {
+    await ensurePrismaConnection();
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Errore connessione database' });
+  }
+  
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {

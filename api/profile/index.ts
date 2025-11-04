@@ -7,6 +7,16 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient }
 const prisma = globalForPrisma.prisma || new PrismaClient()
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
+// Funzione helper per assicurare la connessione
+async function ensurePrismaConnection() {
+  try {
+    await prisma.$connect()
+  } catch (error) {
+    console.error('❌ Errore connessione Prisma:', error)
+    throw error
+  }
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024'
 const DEFAULT_PROFILE_NAME = 'primary'
 
@@ -176,6 +186,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Assicura connessione Prisma prima di qualsiasi query
+    await ensurePrismaConnection()
+    
     const authHeader = req.headers.authorization
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
     const cookieToken = (req as any).cookies?.auth_token || (req as any).cookies?.token
