@@ -67,15 +67,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     try {
       const since = req.query.since as string | undefined;
+      const month = req.query.month as string | undefined; // formato: YYYY-MM
+      const year = req.query.year as string | undefined;   // formato: YYYY
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
+      
       const where: any = { userId };
+      
+      // Filtro incrementale: solo eventi modificati dopo 'since'
       if (since) {
         const sinceDate = new Date(since);
-        if (!isNaN(sinceDate.getTime())) where.updatedAt = { gte: sinceDate };
+        if (!isNaN(sinceDate.getTime())) {
+          where.updatedAt = { gte: sinceDate };
+          console.log(`📊 Sync incrementale: eventi dopo ${sinceDate.toISOString()}`);
+        }
       }
+      
+      // Filtro per mese specifico: YYYY-MM
+      if (month && /^\d{4}-\d{2}$/.test(month)) {
+        const [yearStr, monthStr] = month.split('-');
+        const startDate = new Date(Date.UTC(parseInt(yearStr), parseInt(monthStr) - 1, 1));
+        const endDate = new Date(Date.UTC(parseInt(yearStr), parseInt(monthStr), 0, 23, 59, 59, 999));
+        where.date = { gte: startDate, lte: endDate };
+        console.log(`📅 Lazy loading: eventi di ${month} (${startDate.toISOString()} - ${endDate.toISOString()})`);
+      }
+      // Filtro per anno specifico: YYYY
+      else if (year && /^\d{4}$/.test(year)) {
+        const startDate = new Date(Date.UTC(parseInt(year), 0, 1));
+        const endDate = new Date(Date.UTC(parseInt(year), 11, 31, 23, 59, 59, 999));
+        where.date = { gte: startDate, lte: endDate };
+        console.log(`📅 Lazy loading: eventi del ${year} (${startDate.toISOString()} - ${endDate.toISOString()})`);
+      }
+      
       const rows = await prisma.event.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip: offset,
       });
+      
       const data = rows.map((e) => ({
         id: e.id,
         userId: e.userId,
@@ -88,7 +118,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         createdAt: e.createdAt,
         updatedAt: e.updatedAt,
       }));
-      return res.status(200).json({ success: true, events: data });
+      
+      console.log(`✅ GET /events: restituiti ${data.length} eventi${since ? ' (incrementale)' : ''}`);
+      
+      return res.status(200).json({ success: true, events: data, count: data.length });
     } catch (error) {
       console.error('GET /events error', error);
       return res.status(500).json({ success: false, message: 'Errore interno' });

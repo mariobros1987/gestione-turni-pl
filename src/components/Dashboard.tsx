@@ -10,6 +10,7 @@ import QrCodeScannerWidget from './widgets/QrCodeScannerHtml5';
 import QrCodeStatic from './widgets/QrCodeStatic';
 import { getAiSuggestion } from '../services/aiSuggestionService';
 import { AiEventCreator } from './AiEventCreator';
+import { OfflineStatusWidget } from './widgets/OfflineStatusWidget';
 
 // --- WIDGET COMPONENTS ---
 
@@ -359,6 +360,7 @@ export const Dashboard: React.FC<DashboardProps> = (props) => {
                 <div className="dashboard-customize-header">
                     <h2>Dashboard di {selectedMonthName}</h2>
                     <div className="dashboard-controls">
+                        <OfflineStatusWidget />
                         {isCustomizing && (
                             <button className="btn-add" onClick={() => setIsAddModalOpen(true)}>Aggiungi Widget ➕</button>
                         )}

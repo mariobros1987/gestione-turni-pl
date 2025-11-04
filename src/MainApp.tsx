@@ -49,6 +49,10 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     if (!profileData) {
         return <div className="profile-loading"><p>Caricamento dati profilo…</p></div>;
     }
+    
+    // Timestamp dell'ultima sincronizzazione riuscita (per sync incrementale)
+    const lastSyncKeyRef = useRef<number>(0);
+    
     // Funzione per creare i setter
     const createSetter = <K extends keyof ProfileData>(key: K) => {
         return (value: ProfileData[K]) => {
@@ -456,6 +460,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = safeProfileData;
 
     // Sync eventi unificati dal backend (lettura) – evita "Presenza"
+    // USA SYNC INCREMENTALE per ridurre payload
     useEffect(() => {
         let cancelled = false;
         const token = localStorage.getItem('turni_pl_auth_token');
@@ -463,10 +468,22 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
 
         const fetchAndApply = async () => {
             try {
-                const events = await eventsApiService.list();
+                // Sync incrementale: chiedi solo eventi modificati dopo l'ultima sync
+                const sinceParam = lastSyncKeyRef.current > 0
+                    ? new Date(lastSyncKeyRef.current).toISOString()
+                    : undefined;
+
+                const events = await eventsApiService.list(sinceParam);
                 if (cancelled || !Array.isArray(events)) return;
                 
-                console.log('🔄 Sync da /api/events: ricevuti', events.length, 'eventi');
+                const logPrefix = sinceParam ? `🔄 Sync incrementale (da ${new Date(sinceParam).toLocaleString('it-IT')})` : '🔄 Sync completo';
+                console.log(`${logPrefix}: ricevuti ${events.length} eventi`);
+                
+                // Se sync incrementale e nessun cambiamento, skippa merge
+                if (sinceParam && events.length === 0) {
+                    console.log('✅ Nessun cambiamento, skip merge');
+                    return;
+                }
                 
                 // Costruisci nuove liste tipizzate
                 const { fromServer } = await import('./services/eventsMapper');
@@ -474,7 +491,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                     .filter((e: any) => !(e.type === 'appuntamento' && (e.title === 'Presenza' || e.extra?.title === 'Presenza')))
                     .map((e: any) => fromServer(e));
 
-                const next = {
+                const newEvents = {
                     holidays: entries.filter(e => e.type === 'ferie'),
                     permits: entries.filter(e => e.type === 'permessi'),
                     overtime: entries.filter(e => e.type === 'straordinario'),
@@ -484,39 +501,61 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 } as const;
                 
                 console.log('📊 Eventi mappati:', {
-                    ferie: next.holidays.length,
-                    permessi: next.permits.length,
-                    straordinario: next.overtime.length,
-                    reperibilita: next.onCall.length,
-                    progetti: next.projects.length,
-                    appuntamenti: next.appointments.length,
+                    ferie: newEvents.holidays.length,
+                    permessi: newEvents.permits.length,
+                    straordinario: newEvents.overtime.length,
+                    reperibilita: newEvents.onCall.length,
+                    progetti: newEvents.projects.length,
+                    appuntamenti: newEvents.appointments.length,
                 });
+
+                // Per sync incrementale, mergiamo invece di sostituire
+                const mergeByType = (existing: any[], incoming: any[]) => {
+                    const existingMap = new Map(existing.map(e => [e.id, e]));
+                    incoming.forEach(e => existingMap.set(e.id, e));
+                    return Array.from(existingMap.values());
+                };
+
+                const mergedHolidays = sinceParam ? mergeByType(holidays, newEvents.holidays as any) : newEvents.holidays;
+                const mergedPermits = sinceParam ? mergeByType(permits, newEvents.permits as any) : newEvents.permits;
+                const mergedOvertime = sinceParam ? mergeByType(overtime, newEvents.overtime as any) : newEvents.overtime;
+                const mergedOnCall = sinceParam ? mergeByType(onCall, newEvents.onCall as any) : newEvents.onCall;
+                const mergedProjects = sinceParam ? mergeByType(projects, newEvents.projects as any) : newEvents.projects;
 
                 // Mantieni le presenze locali correnti
                 const presenzeLocali = (appointments || []).filter((a: any) => a.title === 'Presenza');
+                const mergedAppointmentsBase = sinceParam ? mergeByType(
+                    appointments.filter((a: any) => a.title !== 'Presenza'),
+                    newEvents.appointments as any
+                ) : newEvents.appointments;
+                const mergedAppointments = [...mergedAppointmentsBase, ...presenzeLocali];
 
                 // Applica solo se cambiano i contenuti
                 const eq = (a: any[], b: any[]) => JSON.stringify(a.map((x: any) => x.id).sort()) === JSON.stringify(b.map((x: any) => x.id).sort());
                 let changed = false;
-                if (!eq(next.holidays, holidays)) { setHolidays(next.holidays as any); changed = true; }
-                if (!eq(next.permits, permits)) { setPermits(next.permits as any); changed = true; }
-                if (!eq(next.overtime, overtime)) { setOvertime(next.overtime as any); changed = true; }
-                if (!eq(next.onCall, onCall)) { setOnCall(next.onCall as any); changed = true; }
-                if (!eq(next.projects, projects)) { setProjects(next.projects as any); changed = true; }
-
-                const mergedAppointments = [...(next.appointments as any[]), ...presenzeLocali];
+                if (!eq(mergedHolidays, holidays)) { setHolidays(mergedHolidays as any); changed = true; }
+                if (!eq(mergedPermits, permits)) { setPermits(mergedPermits as any); changed = true; }
+                if (!eq(mergedOvertime, overtime)) { setOvertime(mergedOvertime as any); changed = true; }
+                if (!eq(mergedOnCall, onCall)) { setOnCall(mergedOnCall as any); changed = true; }
+                if (!eq(mergedProjects, projects)) { setProjects(mergedProjects as any); changed = true; }
                 if (!eq(mergedAppointments, appointments)) { setAppointments(mergedAppointments as any); changed = true; }
 
                 if (changed) {
                     console.log('✅ Eventi aggiornati da /api/events');
                 }
+
+                // Aggiorna timestamp ultima sync riuscita
+                lastSyncKeyRef.current = Date.now();
             } catch (e) {
-                console.warn('⚠️ Lettura eventi da /api/events fallita (best-effort):', e);
+                console.warn('⚠️ Lettura eventi da /api/events fallita:', e);
             }
         };
 
         fetchAndApply();
-        const interval = setInterval(fetchAndApply, 10000); // 10s
+        
+        // OPZIONE A: Usa polling come fallback (10s) se realtime non disponibile
+        // OPZIONE B: Commenta per usare SOLO realtime senza fallback
+        const interval = setInterval(fetchAndApply, 10000); // 10s fallback
 
         const onVis = () => { if (document.visibilityState === 'visible') fetchAndApply(); };
         document.addEventListener('visibilitychange', onVis);
@@ -524,6 +563,92 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [appointments, holidays, permits, overtime, onCall, projects]);
+
+    // Real-time sync con Supabase Realtime (sostituisce polling per sync istantaneo)
+    useEffect(() => {
+        const token = localStorage.getItem('turni_pl_auth_token');
+        const userStr = localStorage.getItem('turni_pl_user');
+        if (!token || !userStr) return;
+
+        let userId: string;
+        try {
+            const user = JSON.parse(userStr);
+            userId = user.id;
+        } catch {
+            return;
+        }
+
+        // Importa e avvia realtime sync
+        import('./services/realtimeSync').then(({ realtimeSync }) => {
+            realtimeSync.start(userId, async (change) => {
+                console.log('🔔 Realtime change:', change);
+                
+                // Forza un refresh incrementale quando arriva un cambiamento
+                try {
+                    const sinceParam = lastSyncKeyRef.current > 0
+                        ? new Date(lastSyncKeyRef.current).toISOString()
+                        : undefined;
+                    
+                    const events = await eventsApiService.list(sinceParam);
+                    const { fromServer } = await import('./services/eventsMapper');
+                    const entries = events
+                        .filter((e: any) => !(e.type === 'appuntamento' && (e.title === 'Presenza' || e.extra?.title === 'Presenza')))
+                        .map((e: any) => fromServer(e));
+
+                    const newEvents = {
+                        holidays: entries.filter(e => e.type === 'ferie'),
+                        permits: entries.filter(e => e.type === 'permessi'),
+                        overtime: entries.filter(e => e.type === 'straordinario'),
+                        onCall: entries.filter(e => e.type === 'reperibilita'),
+                        projects: entries.filter(e => e.type === 'progetto'),
+                        appointments: entries.filter(e => e.type === 'appuntamento'),
+                    } as const;
+
+                    // Merge logic
+                    const mergeByType = (existing: any[], incoming: any[]) => {
+                        const existingMap = new Map(existing.map(e => [e.id, e]));
+                        incoming.forEach(e => existingMap.set(e.id, e));
+                        return Array.from(existingMap.values());
+                    };
+
+                    const mergedHolidays = mergeByType(holidays, newEvents.holidays as any);
+                    const mergedPermits = mergeByType(permits, newEvents.permits as any);
+                    const mergedOvertime = mergeByType(overtime, newEvents.overtime as any);
+                    const mergedOnCall = mergeByType(onCall, newEvents.onCall as any);
+                    const mergedProjects = mergeByType(projects, newEvents.projects as any);
+
+                    const presenzeLocali = (appointments || []).filter((a: any) => a.title === 'Presenza');
+                    const mergedAppointmentsBase = mergeByType(
+                        appointments.filter((a: any) => a.title !== 'Presenza'),
+                        newEvents.appointments as any
+                    );
+                    const mergedAppointments = [...mergedAppointmentsBase, ...presenzeLocali];
+
+                    // Applica cambiamenti
+                    const eq = (a: any[], b: any[]) => JSON.stringify(a.map((x: any) => x.id).sort()) === JSON.stringify(b.map((x: any) => x.id).sort());
+                    if (!eq(mergedHolidays, holidays)) setHolidays(mergedHolidays as any);
+                    if (!eq(mergedPermits, permits)) setPermits(mergedPermits as any);
+                    if (!eq(mergedOvertime, overtime)) setOvertime(mergedOvertime as any);
+                    if (!eq(mergedOnCall, onCall)) setOnCall(mergedOnCall as any);
+                    if (!eq(mergedProjects, projects)) setProjects(mergedProjects as any);
+                    if (!eq(mergedAppointments, appointments)) setAppointments(mergedAppointments as any);
+
+                    lastSyncKeyRef.current = Date.now();
+                    console.log('✅ Eventi aggiornati da realtime sync');
+                } catch (error) {
+                    console.warn('⚠️ Errore sync realtime:', error);
+                }
+            });
+        });
+
+        return () => {
+            import('./services/realtimeSync').then(({ realtimeSync }) => {
+                realtimeSync.stop();
+            });
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    
     // Imposta filters di default se non definiti
     const defaultCalendarFilters = {
         ferie: true,
