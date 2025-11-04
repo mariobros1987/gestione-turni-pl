@@ -127,6 +127,16 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 const data = json?.checkIns || [];
                 console.log('🔄 Sincronizzazione check-in, trovati:', data.length, 'records');
                 
+                // Aggiorna lo stato locale con tutti i check-in dal database
+                const checkInsFromDb = data.map((entry: any) => ({
+                    id: entry.id ? `checkin-${entry.id}` : `checkin-${entry.timestamp}`,
+                    timestamp: entry.timestamp,
+                    type: entry.type as 'entrata' | 'uscita'
+                }));
+                
+                console.log('📋 Aggiornamento stato locale check-in con:', checkInsFromDb.length, 'entries');
+                setCheckIns(checkInsFromDb);
+                
                 // Raggruppa per giorno e crea appuntamenti "Presenza"
                 const byDay: Record<string, { entrata?: any; uscita?: any }> = {};
                 for (const entry of data) {
