@@ -4,17 +4,35 @@ import jwt from 'jsonwebtoken'
 
 // Singleton Prisma per evitare connessioni multiple
 const globalForPrisma = global as unknown as { prisma: PrismaClient }
-const prisma = globalForPrisma.prisma || new PrismaClient()
+const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
+})
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
-// Funzione helper per assicurare la connessione
-async function ensurePrismaConnection() {
-  try {
-    await prisma.$connect()
-  } catch (error) {
-    console.error('❌ Errore connessione Prisma:', error)
-    throw error
+// Funzione helper per assicurare la connessione con retry
+async function ensurePrismaConnection(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await prisma.$connect()
+      // Test della connessione
+      await prisma.$queryRaw`SELECT 1`
+      console.log('✅ Prisma connesso con successo')
+      return true
+    } catch (error) {
+      console.error(`❌ Tentativo ${i + 1}/${retries} connessione Prisma fallito:`, error)
+      if (i === retries - 1) {
+        throw new Error('Impossibile connettersi al database dopo ' + retries + ' tentativi')
+      }
+      // Attendi prima di riprovare
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)))
+    }
   }
+  return false
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'gestione-turni-secret-key-2024'
