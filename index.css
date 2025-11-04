@@ -10,18 +10,28 @@
     --border-color: #dee2e6;
     --danger-color: #dc3545;
     --success-color: #28a745;
-    --shadow: 0 4px 12px rgba(0,0,0,0.08); /* Softened shadow */
+    --shadow: 0 4px 12px rgba(0,0,0,0.08);
     --input-background: #fff;
     --hover-background: #e9ecef;
-    --popover-background-color: rgba(255, 255, 255, 0.75); /* Added for frosted glass effect */
-    --color-ferie: #007BFF;
-    --color-permessi: #28a745;
+    --popover-background-color: rgba(255, 255, 255, 0.75);
+    
+    /* Event colors - More vibrant! */
+    --color-ferie: #0d6efd;
+    --color-ferie-light: #4d94ff;
+    --color-permessi: #20c997;
+    --color-permessi-light: #5ce0b3;
     --color-straordinario: #ffc107;
-    --color-reperibilita: #6f42c1;
-    --color-progetto: #fd7e14;
-    --color-appuntamento: #17a2b8;
-    --color-shifts: #6c757d;
-    --color-override: #883ab7; /* New color for shift override */
+    --color-straordinario-light: #ffdb4d;
+    --color-reperibilita: #7c3aed;
+    --color-reperibilita-light: #a78bfa;
+    --color-progetto: #ff6b35;
+    --color-progetto-light: #ff9770;
+    --color-appuntamento: #06b6d4;
+    --color-appuntamento-light: #67e8f9;
+    --color-shifts: #64748b;
+    --color-shifts-light: #94a3b8;
+    --color-override: #a855f7;
+    --color-override-light: #c084fc;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1160,14 +1170,17 @@ button:active {
 
 .event {
     color: white;
-    padding: 2px 5px;
-    border-radius: 4px;
+    padding: 3px 6px;
+    border-radius: 6px;
     font-size: 0.8rem;
     margin-bottom: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: left;
+    font-weight: 500;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .more-events-indicator {
@@ -1182,15 +1195,30 @@ button:active {
 }
 
 .event:hover {
-    opacity: 0.8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-.event.ferie { background-color: var(--color-ferie); }
-.event.permessi { background-color: var(--color-permessi); }
-.event.straordinario { background-color: var(--color-straordinario); color: var(--text-color); }
-.event.reperibilita { background-color: var(--color-reperibilita); }
-.event.progetto { background-color: var(--color-progetto); }
-.event.appuntamento { background-color: var(--color-appuntamento); }
+.event.ferie { 
+    background: linear-gradient(135deg, var(--color-ferie) 0%, var(--color-ferie-light) 100%);
+}
+.event.permessi { 
+    background: linear-gradient(135deg, var(--color-permessi) 0%, var(--color-permessi-light) 100%);
+}
+.event.straordinario { 
+    background: linear-gradient(135deg, var(--color-straordinario) 0%, var(--color-straordinario-light) 100%);
+    color: var(--text-color);
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+.event.reperibilita { 
+    background: linear-gradient(135deg, var(--color-reperibilita) 0%, var(--color-reperibilita-light) 100%);
+}
+.event.progetto { 
+    background: linear-gradient(135deg, var(--color-progetto) 0%, var(--color-progetto-light) 100%);
+}
+.event.appuntamento { 
+    background: linear-gradient(135deg, var(--color-appuntamento) 0%, var(--color-appuntamento-light) 100%);
+}
 
 /* Popover Menu Styles (Add Event) */
 .add-event-menu {
@@ -1464,12 +1492,30 @@ button:active {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.event-item.ferie { border-color: var(--color-ferie); }
-.event-item.permessi { border-color: var(--color-permessi); }
-.event-item.straordinario { border-color: var(--color-straordinario); }
-.event-item.reperibilita { border-color: var(--color-reperibilita); }
-.event-item.progetto { border-color: var(--color-progetto); }
-.event-item.appuntamento { border-color: var(--color-appuntamento); }
+.event-item.ferie { 
+    border-color: var(--color-ferie); 
+    border-left-width: 5px;
+}
+.event-item.permessi { 
+    border-color: var(--color-permessi); 
+    border-left-width: 5px;
+}
+.event-item.straordinario { 
+    border-color: var(--color-straordinario); 
+    border-left-width: 5px;
+}
+.event-item.reperibilita { 
+    border-color: var(--color-reperibilita); 
+    border-left-width: 5px;
+}
+.event-item.progetto { 
+    border-color: var(--color-progetto); 
+    border-left-width: 5px;
+}
+.event-item.appuntamento { 
+    border-color: var(--color-appuntamento); 
+    border-left-width: 5px;
+}
 
 .event-item .event-type-label {
     font-weight: 700;
