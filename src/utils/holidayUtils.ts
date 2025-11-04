@@ -49,13 +49,13 @@ export const isFestivo = (date: Date): { isHoliday: boolean; isPatronale: boolea
   const pasquetta = new Date(pasqua);
   pasquetta.setDate(pasqua.getDate() + 1);
 
-  // Formatta la data come MM-DD
-  const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  // Formatta la data come MM-DD usando UTC per evitare problemi di timezone
+  const mmdd = `${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 
   const isFestaFissa = festeFisse.includes(mmdd);
   const isPatronale = mmdd === festaPatronale;
-  const isPasqua = date.getDate() === pasqua.getDate() && date.getMonth() === pasqua.getMonth();
-  const isPasquetta = date.getDate() === pasquetta.getDate() && date.getMonth() === pasquetta.getMonth();
+  const isPasqua = date.getUTCDate() === pasqua.getDate() && date.getUTCMonth() === pasqua.getMonth();
+  const isPasquetta = date.getUTCDate() === pasquetta.getDate() && date.getUTCMonth() === pasquetta.getMonth();
 
   const isHoliday = day === 0 || isFestaFissa || isPasqua || isPasquetta || isPatronale;
 
