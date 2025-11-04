@@ -26,6 +26,7 @@ const NfcReportCard: React.FC<NfcReportCardProps> = ({ appointments, monthDate =
       `06-01`, // Epifania
       `25-04`, // Liberazione
       `01-05`, // Lavoro
+      `05-05`, // Festa Patronale
       `02-06`, // Repubblica
       `15-08`, // Ferragosto
       `01-11`, // Ognissanti

@@ -1149,21 +1149,33 @@ button:active {
 }
 
 .calendar-day.is-holiday {
-    background-color: #ffebee;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border-color: #ef5350;
+    position: relative;
+}
+
+.calendar-day.is-holiday::before {
+    content: '🎉';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 1rem;
+    opacity: 0.6;
 }
 
 .calendar-day.is-holiday:hover {
-    background-color: #ffcdd2;
+    background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+    border-color: #e53935;
 }
 
 .calendar-day.is-ferie {
-    background-color: #e0f2fe; /* Light blue for ferie */
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    border-color: #0ea5e9;
 }
 
 .calendar-day.is-ferie:hover {
-    background-color: #cce7f5;
+    background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
 }
-
 
 .calendar-day.is-holiday .day-number {
     color: #d32f2f;
@@ -1171,8 +1183,34 @@ button:active {
 }
 
 .calendar-day.today.is-holiday .day-number {
-    background-color: #d32f2f;
+    background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
     color: white;
+}
+
+/* Festa patronale - styling speciale */
+.calendar-day.festa-patronale {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 2px solid #ff9800;
+    position: relative;
+}
+
+.calendar-day.festa-patronale::before {
+    content: '⭐';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 1.2rem;
+    animation: twinkle 2s ease-in-out infinite;
+}
+
+.calendar-day.festa-patronale .day-number {
+    color: #e65100;
+    font-weight: 700;
+}
+
+@keyframes twinkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.2); }
 }
 
 

@@ -290,11 +290,14 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                         latest = lastCheckIn ? { type: lastCheckIn.type as 'entrata' | 'uscita', timestamp: lastCheckIn.timestamp } : null;
                     }
 
+                    // Logica di alternanza: 
+                    // - Prima lettura o dopo uscita → ENTRATA
+                    // - Dopo entrata → USCITA
                     if (!latest || latest.type === 'uscita') {
-                        console.log('➡️ AUTO: Ultimo check-in (oggi) è uscita o assente → registro ENTRATA');
+                        console.log('➡️ AUTO: Primo check-in del giorno o ultimo è uscita → registro ENTRATA');
                         setAzioneNfc('entrata');
                     } else {
-                        console.log('⬅️ AUTO: Ultimo check-in (oggi) è entrata → registro USCITA');
+                        console.log('⬅️ AUTO: Ultimo check-in è entrata → registro USCITA (alternanza)');
                         setAzioneNfc('uscita');
                     }
                 } catch (e) {

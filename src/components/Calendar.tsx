@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AllEntryTypes, Shift, ShiftOverride } from '../types/types';
 import { parseDateAsUTC } from '../utils/dateUtils';
 import { getShortEventText } from '../utils/eventUtils';
+import { isFestivo } from '../utils/holidayUtils';
 
 interface CalendarProps {
     events: AllEntryTypes[];
@@ -83,7 +84,7 @@ export const Calendar: React.FC<CalendarProps> = ({ events, onDayClick, shiftPat
                     const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
                     
                     const dayDate = new Date(Date.UTC(year, month, day));
-                    const isSunday = dayDate.getUTCDay() === 0;
+                    const { isHoliday, isPatronale } = isFestivo(dayDate);
 
                     const isMarkedAsHoliday = dayEvents.some(
                         event =>
@@ -91,7 +92,8 @@ export const Calendar: React.FC<CalendarProps> = ({ events, onDayClick, shiftPat
                             (event.type === 'straordinario' && event.timeSlot === 'Festivo')
                     );
                     
-                    const isHolidayClass = isSunday || isMarkedAsHoliday;
+                    const isHolidayClass = isHoliday || isMarkedAsHoliday;
+                    const isPatronaleClass = isPatronale;
 
                     const isFerieDay = dayEvents.some(event => event.type === 'ferie');
                     
@@ -117,7 +119,7 @@ export const Calendar: React.FC<CalendarProps> = ({ events, onDayClick, shiftPat
                     return (
                         <div 
                             key={day} 
-                            className={`calendar-day ${isToday ? 'today' : ''} ${isHolidayClass ? 'is-holiday' : ''} ${isFerieDay ? 'is-ferie' : ''}`}
+                            className={`calendar-day ${isToday ? 'today' : ''} ${isHolidayClass ? 'is-holiday' : ''} ${isPatronaleClass ? 'festa-patronale' : ''} ${isFerieDay ? 'is-ferie' : ''}`}
                             onClick={() => onDayClick(dateKey, dayEvents, shiftOverride)}
                             role="button"
                             aria-label={`Giorno ${day}`}
