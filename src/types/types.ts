@@ -116,13 +116,18 @@ export interface AiInsightResponse {
 
 
 // --- TIPO PER I DATI DEL PROFILO ---
+// NOTA: holidays/permits/overtime/onCall/projects/appointments sono ora gestiti da /api/events
+// e non vengono più salvati nel blob del profilo per evitare conflitti di sincronizzazione
 export interface ProfileData {
+    // Eventi gestiti da /api/events (mantenuti in memoria locale ma non salvati in profile blob)
     holidays: HolidayEntry[];
     permits: PermitEntry[];
     overtime: OvertimeEntry[];
     onCall: OnCallEntry[];
     projects: ProjectEntry[];
     appointments: AppointmentEntry[];
+    
+    // Dati profilo (salvati nel blob)
     shiftOverrides: Record<string, ShiftOverride>;
     workLocation: WorkLocation | null;
     checkIns: CheckInEntry[];

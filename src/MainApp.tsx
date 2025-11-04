@@ -29,6 +29,8 @@ import { parseShiftPattern } from './utils/shiftUtils';
 import { getEventTooltip, getShortEventText } from './utils/eventUtils';
 import { CustomTooltip } from './components/CustomTooltip';
 import { ShiftPatternModal } from './components/modals/ShiftPatternModal';
+import { eventsApiService } from './services/eventsApiService';
+import { toPayload } from './services/eventsMapper';
 import { UserProfile } from './components/auth/UserProfile';
 
 
@@ -205,6 +207,8 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
         }, 5000); // Ridotto a 5 secondi per sync più rapido
         return () => { polling = false; clearInterval(interval); };
     }, [profileData.appointments, setAppointments]);
+
+    
     // Rileva parametro azione NFC dall'URL
     const [azioneNfc, setAzioneNfc] = useState<string | null>(null);
     const [nfcAutoExecuted, setNfcAutoExecuted] = useState(false);
@@ -356,43 +360,10 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     if (!profileData) {
         return <div className="profile-loading"><p>Caricamento dati profilo…</p></div>;
     }
-        // --- POLLING AUTOMATICO EVENTI ---
-        useEffect(() => {
-            const interval = setInterval(() => {
-                // Recupera il token JWT dalla localStorage
-                const token = window.localStorage.getItem('turni_pl_auth_token');
-                if (!token) {
-                    alert('Autenticazione scaduta o non presente. Effettua di nuovo il login.');
-                    clearInterval(interval);
-                    return;
-                }
-                fetch('/api/profiles', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    cache: 'no-store'
-                })
-                    .then(res => {
-                        if (res.status === 401) {
-                            alert('Token JWT scaduto o non valido. Effettua di nuovo il login.');
-                            clearInterval(interval);
-                            return null;
-                        }
-                        return res.json();
-                    })
-                    .then(data => {
-                        if (!data) return;
-                        // Aggiorna solo il profilo attivo
-                        if (data && data.success && data.profiles && data.profiles[profileName]) {
-                            onUpdateProfileData(data.profiles[profileName]);
-                        }
-                    })
-                    .catch(err => console.error('Errore polling eventi:', err));
-            }, 15000); // ogni 15 secondi
-            return () => clearInterval(interval);
-        }, [profileName, onUpdateProfileData]);
+    
+    // NOTA: Polling legacy rimosso - eventi ora sincronizzati via /api/events
+    // Il vecchio polling verso /api/profiles causava conflitti con la nuova architettura
+    
     // Assicura che onCall sia sempre un array
     if (!Array.isArray(profileData.onCall)) {
         profileData.onCall = [];
@@ -483,6 +454,76 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
     nfcCooldownMinutes: typeof (profileData as any).nfcCooldownMinutes === 'number' ? (profileData as any).nfcCooldownMinutes : 30,
     };
     const { holidays, permits, overtime, onCall, projects, appointments, shiftOverrides, calendarFilters, collapsedCards, reminderDays, sentNotifications } = safeProfileData;
+
+    // Sync eventi unificati dal backend (lettura) – evita "Presenza"
+    useEffect(() => {
+        let cancelled = false;
+        const token = localStorage.getItem('turni_pl_auth_token');
+        if (!token) return; // solo se autenticato
+
+        const fetchAndApply = async () => {
+            try {
+                const events = await eventsApiService.list();
+                if (cancelled || !Array.isArray(events)) return;
+                
+                console.log('🔄 Sync da /api/events: ricevuti', events.length, 'eventi');
+                
+                // Costruisci nuove liste tipizzate
+                const { fromServer } = await import('./services/eventsMapper');
+                const entries = events
+                    .filter((e: any) => !(e.type === 'appuntamento' && (e.title === 'Presenza' || e.extra?.title === 'Presenza')))
+                    .map((e: any) => fromServer(e));
+
+                const next = {
+                    holidays: entries.filter(e => e.type === 'ferie'),
+                    permits: entries.filter(e => e.type === 'permessi'),
+                    overtime: entries.filter(e => e.type === 'straordinario'),
+                    onCall: entries.filter(e => e.type === 'reperibilita'),
+                    projects: entries.filter(e => e.type === 'progetto'),
+                    appointments: entries.filter(e => e.type === 'appuntamento'), // senza presenze
+                } as const;
+                
+                console.log('📊 Eventi mappati:', {
+                    ferie: next.holidays.length,
+                    permessi: next.permits.length,
+                    straordinario: next.overtime.length,
+                    reperibilita: next.onCall.length,
+                    progetti: next.projects.length,
+                    appuntamenti: next.appointments.length,
+                });
+
+                // Mantieni le presenze locali correnti
+                const presenzeLocali = (appointments || []).filter((a: any) => a.title === 'Presenza');
+
+                // Applica solo se cambiano i contenuti
+                const eq = (a: any[], b: any[]) => JSON.stringify(a.map((x: any) => x.id).sort()) === JSON.stringify(b.map((x: any) => x.id).sort());
+                let changed = false;
+                if (!eq(next.holidays, holidays)) { setHolidays(next.holidays as any); changed = true; }
+                if (!eq(next.permits, permits)) { setPermits(next.permits as any); changed = true; }
+                if (!eq(next.overtime, overtime)) { setOvertime(next.overtime as any); changed = true; }
+                if (!eq(next.onCall, onCall)) { setOnCall(next.onCall as any); changed = true; }
+                if (!eq(next.projects, projects)) { setProjects(next.projects as any); changed = true; }
+
+                const mergedAppointments = [...(next.appointments as any[]), ...presenzeLocali];
+                if (!eq(mergedAppointments, appointments)) { setAppointments(mergedAppointments as any); changed = true; }
+
+                if (changed) {
+                    console.log('✅ Eventi aggiornati da /api/events');
+                }
+            } catch (e) {
+                console.warn('⚠️ Lettura eventi da /api/events fallita (best-effort):', e);
+            }
+        };
+
+        fetchAndApply();
+        const interval = setInterval(fetchAndApply, 10000); // 10s
+
+        const onVis = () => { if (document.visibilityState === 'visible') fetchAndApply(); };
+        document.addEventListener('visibilitychange', onVis);
+
+        return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onVis); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appointments, holidays, permits, overtime, onCall, projects]);
     // Imposta filters di default se non definiti
     const defaultCalendarFilters = {
         ferie: true,
@@ -617,6 +658,19 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             const reperEntries = entryToSave.filter(ev => ev.type === 'reperibilita') as OnCallEntry[];
             if (reperEntries.length > 0) {
                 setOnCall([...onCall, ...reperEntries].sort((a, b) => parseDateAsUTC(b.date).getTime() - parseDateAsUTC(a.date).getTime()));
+                // Persisti anche su endpoint eventi (async)
+                (async () => {
+                    try {
+                        console.log('📤 Salvataggio batch su /api/events:', reperEntries.length, 'reperibilità');
+                        for (const ev of reperEntries) {
+                            const payload = toPayload(ev);
+                            await eventsApiService.upsert(payload);
+                        }
+                        console.log('✅ Batch salvato con successo su /api/events');
+                    } catch (e) {
+                        console.warn('⚠️ Persistenza eventi (reperibilità) fallita:', e);
+                    }
+                })();
                 return;
             }
             // Per altri tipi, chiama la logica singola per ciascuno
@@ -648,6 +702,25 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
             case 'reperibilita': updater(setOnCall, onCall); break;
             case 'progetto': updater(setProjects, projects); break;
             case 'appuntamento': updater(setAppointments, appointments); break;
+        }
+
+        // Persistenza SEMPRE su endpoint eventi (eccetto "Presenza" derivata da check-in)
+        if (!(entryToSave.type === 'appuntamento' && (entryToSave as any).title === 'Presenza')) {
+            (async () => {
+                try {
+                    const payload = toPayload(entryToSave);
+                    console.log('📤 Salvataggio evento su /api/events:', payload.type, isNew ? '(nuovo)' : '(aggiornamento)');
+                    if (isNew) {
+                        await eventsApiService.upsert(payload);
+                    } else {
+                        await eventsApiService.update(payload);
+                    }
+                    console.log('✅ Evento salvato su /api/events con successo');
+                } catch (e) {
+                    console.error('❌ Persistenza evento su /api/events fallita:', e);
+                    alert('Errore durante il salvataggio dell\'evento. Riprova.');
+                }
+            })();
         }
     }, [allEvents, holidays, permits, overtime, onCall, projects, appointments, setHolidays, setPermits, setOvertime, setOnCall, setProjects, setAppointments]);
     
@@ -686,6 +759,20 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 })();
             }
             setAppointments(appointments.filter(e => e.id !== id));
+            // Per appuntamenti non "Presenza", rimuovi SEMPRE da /api/events
+            const nonPresenza = appointments.find(a => a.id === id && a.title !== 'Presenza');
+            if (nonPresenza) {
+                (async () => {
+                    try {
+                        console.log('🗑️ Eliminazione evento da /api/events:', id);
+                        await eventsApiService.remove(id);
+                        console.log('✅ Evento eliminato da /api/events con successo');
+                    } catch (e) {
+                        console.error('❌ Rimozione evento /api/events fallita:', e);
+                        alert('Errore durante l\'eliminazione dell\'evento. Riprova.');
+                    }
+                })();
+            }
         } else {
             switch (type) {
                 case 'ferie': setHolidays(holidays.filter(e => e.id !== id)); break;
@@ -694,6 +781,17 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 case 'reperibilita': setOnCall(onCall.filter(e => e.id !== id)); break;
                 case 'progetto': setProjects(projects.filter(e => e.id !== id)); break;
             }
+            // Rimuovi SEMPRE da endpoint eventi
+            (async () => {
+                try {
+                    console.log('🗑️ Eliminazione evento da /api/events:', id);
+                    await eventsApiService.remove(id);
+                    console.log('✅ Evento eliminato da /api/events con successo');
+                } catch (e) {
+                    console.error('❌ Rimozione evento /api/events fallita:', e);
+                    alert('Errore durante l\'eliminazione dell\'evento. Riprova.');
+                }
+            })();
         }
     }, [holidays, permits, overtime, onCall, projects, appointments, setHolidays, setPermits, setOvertime, setOnCall, setProjects, setAppointments]);
 

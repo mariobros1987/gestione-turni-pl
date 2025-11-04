@@ -202,12 +202,15 @@ const App: React.FC = () => {
 
   function getInitialProfileData(profileName: string): ProfileData {
     return {
+    // Eventi NON salvati nel blob (gestiti da /api/events)
     holidays: [],
     permits: [],
     overtime: [],
     onCall: [],
     projects: [],
     appointments: [],
+    
+    // Dati profilo (salvati nel blob)
     shiftOverrides: {},
     workLocation: null,
     checkIns: [],
@@ -301,25 +304,26 @@ const App: React.FC = () => {
         try {
           console.log('📤 Invio profilo al server...');
           
-          // Filtra le presenze (generate dai check-in) dagli appointments prima di salvare
-          const appointmentsWithoutPresenze = (rest.appointments || []).filter(
-            (a: any) => a.title !== 'Presenza'
-          );
-          const dataToSave = {
-            ...rest,
-            appointments: appointmentsWithoutPresenze
-          };
+          // DISACCOPPIAMENTO: filtra TUTTI gli eventi (non solo presenze) prima di salvare
+          // Gli eventi sono ora gestiti esclusivamente da /api/events
+          const { holidays, permits, overtime, onCall, projects, appointments, ...profileOnlyData } = rest;
           
-          console.log('📊 Salvataggio profilo:', {
-            totalAppointments: rest.appointments?.length || 0,
-            presenze: (rest.appointments?.length || 0) - appointmentsWithoutPresenze.length,
-            appointmentsDaSalvare: appointmentsWithoutPresenze.length
+          console.log('📊 Salvataggio profilo (solo metadati, eventi esclusi):', {
+            eventiEsclusi: {
+              holidays: holidays?.length || 0,
+              permits: permits?.length || 0,
+              overtime: overtime?.length || 0,
+              onCall: onCall?.length || 0,
+              projects: projects?.length || 0,
+              appointments: appointments?.length || 0,
+            },
+            profiloSalvato: Object.keys(profileOnlyData)
           });
           
-          const saved = await profileApiService.saveProfile(dataToSave);
+          const saved = await profileApiService.saveProfile(profileOnlyData);
           if (saved) {
-            console.log('✅ Profilo salvato sul server con successo (senza presenze)');
-            lastServerSnapshotRef.current = JSON.stringify(dataToSave);
+            console.log('✅ Profilo salvato sul server con successo (solo metadati)');
+            lastServerSnapshotRef.current = JSON.stringify(profileOnlyData);
           } else {
             console.warn('⚠️ Salvataggio server fallito, rimarrà in locale');
           }
@@ -377,33 +381,48 @@ const App: React.FC = () => {
         }
 
         console.log('🔄 Sincronizzazione server → client: nuovi dati ricevuti');
-        console.log('📊 Eventi nel profilo server:', {
-          holidays: normalized.holidays?.length || 0,
-          permits: normalized.permits?.length || 0,
-          overtime: normalized.overtime?.length || 0,
-          onCall: normalized.onCall?.length || 0,
-          appointments: normalized.appointments?.length || 0
+        console.log('📊 Profilo server (metadati):', {
+          shiftOverrides: Object.keys(normalized.shiftOverrides || {}).length,
+          workLocation: normalized.workLocation?.name || 'none',
+          checkIns: normalized.checkIns?.length || 0,
+          // Eventi ora gestiti da /api/events, non dal profilo
+          eventsDisclaimer: 'Holidays/permits/overtime/onCall/projects/appointments gestiti da /api/events'
         });
         
-        // Mantieni le presenze locali (generate dai check-in) durante la sincronizzazione
+        // DISACCOPPIAMENTO: mantieni gli eventi locali correnti (gestiti da /api/events)
+        // Prendi solo i metadati del profilo dal server
+        const { holidays: _h, permits: _p, overtime: _o, onCall: _oc, projects: _pr, appointments: _a, ...serverMetadata } = normalized;
+        
+        // Merge: metadati dal server + eventi locali correnti + presenze da check-in
         const currentPresenze = profileData && Array.isArray(profileData.appointments)
           ? profileData.appointments.filter((a: any) => a.title === 'Presenza')
           : [];
-        const serverAppointments = (normalized.appointments || []).filter(
-          (a: any) => a.title !== 'Presenza'
-        );
         
-        const mergedAppointments = [...serverAppointments, ...currentPresenze];
-        
-        console.log('🔀 Merge appointments:', {
-          dalServer: serverAppointments.length,
-          presenzeLocali: currentPresenze.length,
-          totale: mergedAppointments.length
+        console.log('🔀 Merge profilo:', {
+          metadatiDalServer: Object.keys(serverMetadata).length,
+          eventiLocali: {
+            holidays: profileData?.holidays?.length || 0,
+            permits: profileData?.permits?.length || 0,
+            overtime: profileData?.overtime?.length || 0,
+            onCall: profileData?.onCall?.length || 0,
+            projects: profileData?.projects?.length || 0,
+            appointments: (profileData?.appointments?.length || 0) - currentPresenze.length,
+          },
+          presenzeLocali: currentPresenze.length
         });
         
         setProfileData({
-          ...normalized,
-          appointments: mergedAppointments
+          ...serverMetadata,
+          // Eventi locali (sincronizzati tramite /api/events)
+          holidays: profileData?.holidays || [],
+          permits: profileData?.permits || [],
+          overtime: profileData?.overtime || [],
+          onCall: profileData?.onCall || [],
+          projects: profileData?.projects || [],
+          appointments: [
+            ...(profileData?.appointments?.filter((a: any) => a.title !== 'Presenza') || []),
+            ...currentPresenze
+          ],
         });
         lastServerSnapshotRef.current = previewSnapshot;
         // NON aggiorniamo lastLocalChangeRef qui per non bloccare la prossima sync
