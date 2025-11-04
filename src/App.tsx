@@ -300,10 +300,26 @@ const App: React.FC = () => {
       saveTimeoutRef.current = window.setTimeout(async () => {
         try {
           console.log('📤 Invio profilo al server...');
-          const saved = await profileApiService.saveProfile(rest);
+          
+          // Filtra le presenze (generate dai check-in) dagli appointments prima di salvare
+          const appointmentsWithoutPresenze = (rest.appointments || []).filter(
+            (a: any) => a.title !== 'Presenza'
+          );
+          const dataToSave = {
+            ...rest,
+            appointments: appointmentsWithoutPresenze
+          };
+          
+          console.log('📊 Salvataggio profilo:', {
+            totalAppointments: rest.appointments?.length || 0,
+            presenze: (rest.appointments?.length || 0) - appointmentsWithoutPresenze.length,
+            appointmentsDaSalvare: appointmentsWithoutPresenze.length
+          });
+          
+          const saved = await profileApiService.saveProfile(dataToSave);
           if (saved) {
-            console.log('✅ Profilo salvato sul server con successo');
-            lastServerSnapshotRef.current = JSON.stringify(rest);
+            console.log('✅ Profilo salvato sul server con successo (senza presenze)');
+            lastServerSnapshotRef.current = JSON.stringify(dataToSave);
           } else {
             console.warn('⚠️ Salvataggio server fallito, rimarrà in locale');
           }
@@ -369,7 +385,26 @@ const App: React.FC = () => {
           appointments: normalized.appointments?.length || 0
         });
         
-        setProfileData(normalized);
+        // Mantieni le presenze locali (generate dai check-in) durante la sincronizzazione
+        const currentPresenze = profileData && Array.isArray(profileData.appointments)
+          ? profileData.appointments.filter((a: any) => a.title === 'Presenza')
+          : [];
+        const serverAppointments = (normalized.appointments || []).filter(
+          (a: any) => a.title !== 'Presenza'
+        );
+        
+        const mergedAppointments = [...serverAppointments, ...currentPresenze];
+        
+        console.log('🔀 Merge appointments:', {
+          dalServer: serverAppointments.length,
+          presenzeLocali: currentPresenze.length,
+          totale: mergedAppointments.length
+        });
+        
+        setProfileData({
+          ...normalized,
+          appointments: mergedAppointments
+        });
         lastServerSnapshotRef.current = previewSnapshot;
         // NON aggiorniamo lastLocalChangeRef qui per non bloccare la prossima sync
         console.log('✅ Sincronizzazione completata con successo');
