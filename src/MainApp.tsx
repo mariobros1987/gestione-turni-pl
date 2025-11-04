@@ -1350,25 +1350,7 @@ export const MainApp: React.FC<MainAppProps> = ({ profileName, profileData, onUp
                 </div>
             )}
 
-            {/* Se l'URL contiene ?azione=entrata o ?azione=uscita mostra i pulsanti NFC */}
-            {azioneNfc && (
-                <div style={{ 
-                    background: '#e3f7e3', 
-                    border: '2px solid #2e7d32', 
-                    padding: '20px', 
-                    borderRadius: '12px', 
-                    margin: '16px 0',
-                    textAlign: 'center',
-                    animation: 'fadeIn 0.3s ease-in'
-                }}>
-                    <h2 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
-                        ✅ {azioneNfc === 'entrata' ? 'Entrata' : 'Uscita'} Registrata!
-                    </h2>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#555' }}>
-                        Check-in salvato automaticamente via NFC
-                    </p>
-                </div>
-            )}
+            {/* Header della pagina */}
             <header>
                 <div className="header-profile-info">
                     <h1>Gestione Turni P.L.</h1>
