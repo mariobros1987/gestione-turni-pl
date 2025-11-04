@@ -322,40 +322,57 @@ const App: React.FC = () => {
     }
 
     let cancelled = false;
-    const SYNC_INTERVAL = 10000; // Ridotto a 10 secondi per sync più frequente
+    const SYNC_INTERVAL = 5000; // 5 secondi per sincronizzazione rapida
 
     const pullServerProfiles = async (force = false) => {
       if (cancelled) {
+        console.log('🛑 Sincronizzazione annullata (componente smontato)');
         return;
       }
 
       const now = Date.now();
-      // Ridotto il tempo di blocco da 4s a 2s per permettere sync più rapide
-      if (!force && now - lastLocalChangeRef.current < 2000) {
+      const timeSinceLastChange = now - lastLocalChangeRef.current;
+      
+      // Ridotto il tempo di blocco da 2s a 1s per permettere sync più rapide
+      if (!force && timeSinceLastChange < 1000) {
+        console.log(`⏸️ Sincronizzazione posticipata (ultima modifica locale ${timeSinceLastChange}ms fa)`);
         return;
       }
 
       try {
         const profileKey = deriveProfileKey(currentUser);
         if (!profileKey) {
+          console.warn('⚠️ ProfileKey mancante, impossibile sincronizzare');
           return;
         }
 
+        console.log('🔍 Controllo aggiornamenti dal server...');
         const serverProfile = await profileApiService.getProfile();
         if (!serverProfile) {
+          console.warn('⚠️ Nessun profilo trovato sul server');
           return;
         }
 
         const normalized = ensureProfileForUser(serverProfile, profileKey);
         const previewSnapshot = JSON.stringify(normalized);
         if (!force && previewSnapshot === lastServerSnapshotRef.current) {
+          console.log('✅ Profilo già aggiornato (nessuna modifica dal server)');
           return;
         }
 
-        console.log('🔄 Sincronizzazione server → client completata');
+        console.log('🔄 Sincronizzazione server → client: nuovi dati ricevuti');
+        console.log('📊 Eventi nel profilo server:', {
+          holidays: normalized.holidays?.length || 0,
+          permits: normalized.permits?.length || 0,
+          overtime: normalized.overtime?.length || 0,
+          onCall: normalized.onCall?.length || 0,
+          appointments: normalized.appointments?.length || 0
+        });
+        
         setProfileData(normalized);
         lastServerSnapshotRef.current = previewSnapshot;
-        lastLocalChangeRef.current = Date.now();
+        // NON aggiorniamo lastLocalChangeRef qui per non bloccare la prossima sync
+        console.log('✅ Sincronizzazione completata con successo');
       } catch (error) {
         console.error('❌ Errore sincronizzazione server → client:', error);
       }
